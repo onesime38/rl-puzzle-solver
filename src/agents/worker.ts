@@ -1,10 +1,12 @@
-import { buildCube, buildMegaminx, type Puzzle } from "../engine";
+import { buildCube, buildPyraminx, type Puzzle } from "../engine";
 import { runBenchmark } from "./benchmark";
 import { MDPAgent } from "./mdp";
+import { PyraminxMDPAgent } from "./mdpPyraminx";
 import type { WorkerRequest, WorkerResponse } from "./protocol";
 import { QAgent } from "./qlearning";
 import { train } from "./train";
 import type { AgentParams, Algorithm, PuzzleId } from "./types";
+import { PUZZLE_PROFILES } from "./types";
 
 interface WorkerScope {
   postMessage(message: WorkerResponse): void;
@@ -13,15 +15,15 @@ interface WorkerScope {
 
 declare const self: WorkerScope;
 
-const PUZZLES: Record<PuzzleId, Puzzle> = { cube: buildCube(), megaminx: buildMegaminx() };
+const PUZZLES: Record<PuzzleId, Puzzle> = { cube: buildCube(), pyraminx: buildPyraminx() };
 
 /** Trained agents, keyed by `${puzzle}:${algo}`. */
-const agents = new Map<string, QAgent | MDPAgent>();
+const agents = new Map<string, QAgent | MDPAgent | PyraminxMDPAgent>();
 const agentParams = new Map<string, Partial<AgentParams>>();
 
 let currentAlgo: Algorithm = "q";
 let currentPuzzle: PuzzleId = "cube";
-let currentAgent: QAgent | MDPAgent | null = null;
+let currentAgent: QAgent | MDPAgent | PyraminxMDPAgent | null = null;
 let training = false;
 
 function post(message: WorkerResponse): void {
@@ -32,19 +34,31 @@ function keyFor(puzzle: PuzzleId, algo: Algorithm): string {
   return `${puzzle}:${algo}`;
 }
 
-function makeAgent(puzzle: PuzzleId, algo: Algorithm, params: Partial<AgentParams>): QAgent | MDPAgent {
+function makeAgent(
+  puzzle: PuzzleId,
+  algo: Algorithm,
+  params: Partial<AgentParams>,
+): QAgent | MDPAgent | PyraminxMDPAgent {
   const P = PUZZLES[puzzle];
   const entry = keyFor(puzzle, algo);
   const previous = agents.get(entry);
   if (previous && paramsEqual(agentParams.get(entry), params)) return previous;
 
   if (algo === "mdp") {
-    const agent = new MDPAgent(P, {
-      gamma: params.gamma,
-      slip: params.slip,
-      maxDepth: params.maxDepth,
-      seed: params.seed,
-    });
+    const agent: MDPAgent | PyraminxMDPAgent =
+      puzzle === "pyraminx"
+        ? new PyraminxMDPAgent(P as ReturnType<typeof buildPyraminx>, {
+            gamma: params.gamma,
+            slip: params.slip,
+            maxStates: params.maxStates,
+            seed: params.seed,
+          })
+        : new MDPAgent(P, {
+            gamma: params.gamma,
+            slip: params.slip,
+            maxDepth: params.maxDepth ?? PUZZLE_PROFILES[puzzle].mdpMaxDepth,
+            seed: params.seed,
+          });
     agents.set(entry, agent);
     agentParams.set(entry, params);
     return agent;
@@ -67,6 +81,7 @@ function paramsEqual(a: Partial<AgentParams> | undefined, b: Partial<AgentParams
     a.maxDepth === b.maxDepth &&
     a.stepMul === b.stepMul &&
     a.stepAdd === b.stepAdd &&
+    a.maxStates === b.maxStates &&
     a.seed === b.seed
   );
 }
@@ -77,8 +92,13 @@ function stopTraining(): void {
 
 async function trainLoop(maxEpisodes: number, algo: Algorithm): Promise<void> {
   const agent = currentAgent as QAgent;
+  const profile = PUZZLE_PROFILES[currentPuzzle];
   const summary = train(agent, {
     maxEpisodes,
+    epochSize: currentPuzzle === "pyraminx" ? 2000 : 400,
+    testTrials: 100,
+    targetRate: profile.targetRate ?? 0.95,
+    stopRate: profile.stopRate ?? 0.97,
     shouldContinue: () => training,
     onProgress: (point) => {
       post({
@@ -128,6 +148,34 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
         const maxEpisodes = msg.maxEpisodes ?? 400_000;
 
         if (currentAlgo === "mdp") {
+          if (currentPuzzle === "pyraminx") {
+            const agent = currentAgent as PyraminxMDPAgent;
+            training = true;
+            post({ type: "training-started", id: msg.id });
+            void agent
+              .buildAsync({
+                shouldContinue: () => training,
+                onProgress: (p) =>
+                  post({
+                    type: "mdp-progress",
+                    phase: p.phase,
+                    states: p.states,
+                    iterations: p.progress,
+                  }),
+              })
+              .then((result) => {
+                training = false;
+                post({
+                  type: "mdp-built",
+                  id: msg.id,
+                  states: result.states,
+                  iterations: result.iterations,
+                  deltas: agent.deltas,
+                  cancelled: result.cancelled,
+                });
+              });
+            break;
+          }
           const agent = currentAgent as MDPAgent;
           const { states, iterations } = agent.build();
           post({ type: "mdp-built", id: msg.id, states, iterations, deltas: agent.deltas });
@@ -162,7 +210,10 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
           break;
         }
         const state = new Uint8Array(msg.state);
-        const result = currentAgent.solve(state, msg.maxSteps ?? 40);
+        const result =
+          currentAgent instanceof QAgent
+            ? currentAgent.solve(state, msg.maxSteps ?? 40, msg.horizon ?? 0)
+            : currentAgent.solve(state, msg.maxSteps ?? 40);
         post({ type: "solve-result", id: msg.id, result });
         break;
       }
@@ -172,7 +223,10 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
           post({ type: "error", id: msg.id, message: "Aucun agent entraîné." });
           break;
         }
-        const stats = currentAgent.evaluateStats(msg.depth, msg.trials ?? 80);
+        const stats =
+          currentAgent instanceof QAgent
+            ? currentAgent.evaluateStats(msg.depth, msg.trials ?? 80, msg.horizon ?? 0)
+            : currentAgent.evaluateStats(msg.depth, msg.trials ?? 80);
         post({ type: "eval-result", id: msg.id, depth: msg.depth, stats });
         break;
       }
@@ -180,6 +234,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>): void => {
       case "benchmark": {
         void runBenchmark({
           ...msg.config,
+          planningHorizon: msg.planningHorizon,
           onProgress: (msgLabel) => post({ type: "status", message: msgLabel }),
         }).then((result) => {
           post({ type: "benchmark-result", id: msg.id, result });

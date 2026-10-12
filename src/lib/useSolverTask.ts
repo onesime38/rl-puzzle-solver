@@ -94,6 +94,12 @@ export function useSolverTask(puzzle: PuzzleId) {
             mdp: { states: response.states, iterations: response.iterations, deltas: response.deltas },
           }));
           break;
+        case "mdp-progress":
+          setState((prev) => ({
+            ...prev,
+            mdp: { states: response.states, iterations: response.iterations, deltas: [] },
+          }));
+          break;
         case "error":
           setState((prev) => ({ ...prev, error: response.message }));
           break;
@@ -126,22 +132,32 @@ export function useSolverTask(puzzle: PuzzleId) {
     setState(INITIAL);
   }, []);
 
-  const solve = useCallback(async (stateBytes: Uint8Array, maxSteps = 40): Promise<SolveResult> => {
-    const client = clientRef.current;
-    const response = await client.request({
-      type: "solve",
-      id: client.nextId(),
-      state: Array.from(stateBytes),
-      maxSteps,
-    });
-    if (response.type === "solve-result") return response.result;
-    return { solved: false, path: [] };
-  }, []);
+  const solve = useCallback(
+    async (stateBytes: Uint8Array, maxSteps = 40, horizon = 0): Promise<SolveResult> => {
+      const client = clientRef.current;
+      const response = await client.request({
+        type: "solve",
+        id: client.nextId(),
+        state: Array.from(stateBytes),
+        maxSteps,
+        horizon,
+      });
+      if (response.type === "solve-result") return response.result;
+      return { solved: false, path: [] };
+    },
+    [],
+  );
 
   const evaluate = useCallback(
-    async (depth: number, trials = 80): Promise<EvaluationStats | null> => {
+    async (depth: number, trials = 80, horizon = 0): Promise<EvaluationStats | null> => {
       const client = clientRef.current;
-      const response = await client.request({ type: "evaluate", id: client.nextId(), depth, trials });
+      const response = await client.request({
+        type: "evaluate",
+        id: client.nextId(),
+        depth,
+        trials,
+        horizon,
+      });
       return response.type === "eval-result" ? response.stats : null;
     },
     [],

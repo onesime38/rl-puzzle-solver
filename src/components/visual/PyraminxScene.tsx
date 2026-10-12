@@ -1,14 +1,15 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import type { MegaminxPuzzle } from "../../engine";
-import { buildMegaminxScene } from "./minxScene";
+import type { PyraminxPuzzle } from "../../engine";
+import { buildPyraminxScene } from "./pyraScene";
+import { unit } from "./pyraGeometry";
 import type { PuzzleViewHandle } from "./types";
-import "./minxView.css";
+import "./pyraView.css";
 
-interface MegaminxSceneProps {
-  puzzle: MegaminxPuzzle;
-  /** Fired when the user clicks a face (action is already the inverse-appropriate move). */
+interface PyraminxSceneProps {
+  puzzle: PyraminxPuzzle;
+  /** Fired when the user clicks near a vertex (action already accounts for inverse). */
   onPickFace?: (action: number) => void;
 }
 
@@ -28,17 +29,17 @@ function easeInOut(t: number): number {
 }
 
 /**
- * Three.js view of the Megaminx.
+ * Three.js view of the Pyraminx.
  *
- * All transform bookkeeping lives in the framework-free `minxScene` model: the
- * 132 stickers never move permanently, only their colour follows the engine
- * state, and a turn is a temporary pivot rotation that is always rolled back
- * explicitly. This component only owns the WebGL renderer, the camera, the
+ * All transform bookkeeping lives in the framework-free `pyraScene` model: the
+ * 36 stickers and 4 caps never move permanently, only their colour follows the
+ * engine state, and a turn is a temporary pivot rotation that is always rolled
+ * back explicitly. This component only owns the WebGL renderer, the camera, the
  * lighting and a **serialized** move queue: at most one layer animates at a
  * time, so animations can never overlap or leave a sticker displaced.
  */
-export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
-  function MegaminxScene({ puzzle, onPickFace }, ref) {
+export const PyraminxScene = forwardRef<PuzzleViewHandle, PyraminxSceneProps>(
+  function PyraminxScene({ puzzle, onPickFace }, ref) {
     const mountRef = useRef<HTMLDivElement>(null);
     const onPickFaceRef = useRef(onPickFace);
     onPickFaceRef.current = onPickFace;
@@ -63,8 +64,8 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
       let disposed = false;
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-      camera.position.set(4.9, 3.4, 5.7);
+      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+      camera.position.set(3.7, 3.1, 4.5);
 
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -76,10 +77,10 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
       controls.enableDamping = true;
       controls.dampingFactor = 0.09;
       controls.enablePan = false;
-      controls.minDistance = 5;
-      controls.maxDistance = 13;
+      controls.minDistance = 3.4;
+      controls.maxDistance = 11;
       controls.rotateSpeed = 0.85;
-      controls.target.set(0, 0.05, 0);
+      controls.target.set(0, 0, 0);
 
       scene.add(new THREE.HemisphereLight(0xffffff, 0x5a6472, 1.1));
       const key = new THREE.DirectionalLight(0xffffff, 1.9);
@@ -88,10 +89,10 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
       key.shadow.mapSize.set(1024, 1024);
       key.shadow.camera.near = 2;
       key.shadow.camera.far = 20;
-      key.shadow.camera.left = -5;
-      key.shadow.camera.right = 5;
-      key.shadow.camera.top = 5;
-      key.shadow.camera.bottom = -5;
+      key.shadow.camera.left = -4;
+      key.shadow.camera.right = 4;
+      key.shadow.camera.top = 4;
+      key.shadow.camera.bottom = -4;
       key.shadow.bias = -0.002;
       scene.add(key);
       const rim = new THREE.DirectionalLight(0xffffff, 0.6);
@@ -100,24 +101,27 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
 
       // Soft shadow on a ground plane (the puzzle itself does not touch it).
       const ground = new THREE.Mesh(
-        new THREE.CircleGeometry(4.4, 64).rotateX(-Math.PI / 2),
+        new THREE.CircleGeometry(3.6, 64).rotateX(-Math.PI / 2),
         new THREE.ShadowMaterial({ opacity: 0.3 }),
       );
-      ground.position.y = -2.05;
+      ground.position.y = -1.7;
       ground.receiveShadow = true;
       scene.add(ground);
 
       // Everything the puzzle is made of is built once, here, and disposed in
       // the cleanup. StrictMode's double effect therefore rebuilds a fresh
       // model and drops the first one — never two overlapping sets of meshes.
-      const built = buildMegaminxScene(puzzle);
+      const built = buildPyraminxScene(puzzle);
       scene.add(built.root);
+
+      const vertexAxes = puzzle.vertices.map((v) => {
+        const u = unit(v);
+        return new THREE.Vector3(u[0], u[1], u[2]);
+      });
 
       // --- Serialized move queue: one layer animation at a time. -------------
       const queue: QueuedMove[] = [];
       let running = false;
-      // Bumped on reset/unmount so stale animation frames become no-ops without
-      // touching the shared state of the move that replaced them.
       let generation = 0;
 
       function pump(): void {
@@ -125,7 +129,7 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
         const job = queue.shift()!;
         running = true;
         const gen = ++generation;
-        const duration = reduced ? 0 : apiRef.current?.speed ?? 280;
+        const duration = reduced ? 0 : apiRef.current?.speed ?? 260;
         built.beginMove(job.action);
 
         const finishJob = () => {
@@ -143,8 +147,6 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
         const start = performance.now();
         const step = () => {
           if (disposed || gen !== generation) {
-            // Cancelled (reset/unmount): never touch `running`; the reset path
-            // has already cleared it and the model has rolled the layer back.
             job.resolve();
             return;
           }
@@ -174,10 +176,10 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
         built.reset();
       }
 
-      apiRef.current = { animate, reset, speed: 280 };
+      apiRef.current = { animate, reset, speed: 260 };
       if (reduced) apiRef.current.speed = 0;
 
-      // --- Face picker: a plain click turns the clicked face. -----------------
+      // --- Vertex picker: a plain click turns the nearest vertex. ------------
       const raycaster = new THREE.Raycaster();
       let downX = 0;
       let downY = 0;
@@ -202,19 +204,19 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
         raycaster.setFromCamera(ndc, camera);
         const hits = raycaster.intersectObject(built.body, false);
         if (hits.length === 0) return;
-        const nrm = (hits[0].normal as THREE.Vector3).clone().normalize();
+        const point = hits[0].point.clone().normalize();
         let best = -1;
         let bestDot = -Infinity;
-        for (let g = 0; g < 12; g++) {
-          const d = nrm.dot(built.axes[2 * g]);
+        for (let v = 0; v < 4; v++) {
+          const d = point.dot(vertexAxes[v]);
           if (d > bestDot) {
             bestDot = d;
-            best = g;
+            best = v;
           }
         }
-        if (best >= 0 && bestDot > 0.95) {
+        if (best >= 0) {
           const inverse = e.shiftKey || e.altKey;
-          const action = inverse ? 2 * best : 2 * best + 1;
+          const action = inverse ? 2 * best + 1 : 2 * best;
           onPickFaceRef.current?.(action);
         }
       }
@@ -262,8 +264,10 @@ export const MegaminxScene = forwardRef<PuzzleViewHandle, MegaminxSceneProps>(
     }, [puzzle]);
 
     return (
-      <div className="minx-view" ref={mountRef} aria-label="Vue 3D du Megaminx" role="img">
-        <span className="minx-hint">cliquez une face pour la tourner · Maj ou Alt + clic pour l'inverse</span>
+      <div className="pyra-view" ref={mountRef} aria-label="Vue 3D du Pyraminx" role="img">
+        <span className="pyra-hint">
+          cliquez près d'un sommet pour tourner · Maj ou Alt + clic pour l'inverse
+        </span>
       </div>
     );
   },

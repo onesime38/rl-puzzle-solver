@@ -2,16 +2,18 @@
  * Command-line benchmark.
  *
  * Trains Q-learning, Double Q-learning and the MDP agent on the 3×3×3 cube and
- * the Megaminx, measures the success rate per depth, prints a table and writes
- * `results.json` (imported by the home page and the results page).
+ * the Pyraminx, measures the success rate per depth, prints a table and writes
+ * `results.json` plus the benchmark and robustness CSV files into `reports/`
+ * (a folder used for the written report, not by the website).
  *
  * Usage:
- *   npm run bench            # defaults: depths 1..5, 80 trials per cell
- *   npm run bench -- --max-depth 4 --trials 100 --epochs 300000 --seed 7
+ *   npm run benchmark            # defaults: depths 1..8, 80 trials per cell
+ *   npm run benchmark -- --max-depth 4 --trials 100 --episodes 300000 --seed 7
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { runBenchmark, type Algorithm, type BenchmarkResult, type PuzzleId } from "../src/agents";
+import { benchmarkToCsv, benchmarkToJson, robustnessToCsv } from "../src/lib/download";
 
 interface CliOptions {
   puzzles: PuzzleId[];
@@ -19,7 +21,7 @@ interface CliOptions {
   depths: number[];
   robustnessDepths: number[];
   trials: number;
-  maxEpisodes: number;
+  maxEpisodes?: number;
   maxStates: number;
   seed: number;
   out: string;
@@ -34,15 +36,14 @@ function numberValue(name: string, value: string | undefined, fallback: number):
 
 function parseArgs(argv: string[]): CliOptions {
   const opts: CliOptions = {
-    puzzles: ["cube", "megaminx"],
+    puzzles: ["cube", "pyraminx"],
     algorithms: ["q", "dq", "mdp"],
-    depths: [1, 2, 3, 4, 5],
-    robustnessDepths: [1, 2, 3, 4, 5, 6, 7, 8],
+    depths: [1, 2, 3, 4, 5, 6, 7, 8],
+    robustnessDepths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
     trials: 80,
-    maxEpisodes: 400_000,
     maxStates: 1_000_000,
     seed: 12345,
-    out: resolve(process.cwd(), "src/data/results.json"),
+    out: resolve(process.cwd(), "reports/results.json"),
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -50,20 +51,20 @@ function parseArgs(argv: string[]): CliOptions {
     const next = (): string | undefined => argv[i + 1];
     switch (arg) {
       case "--max-depth": {
-        const maxDepth = numberValue("max-depth", next(), 5);
+        const maxDepth = numberValue("max-depth", next(), 8);
         opts.depths = Array.from({ length: maxDepth }, (_, d) => d + 1);
         i++;
         break;
       }
       case "--depths":
-        opts.depths = (next() ?? "1,2,3,4,5")
+        opts.depths = (next() ?? "1,2,3,4,5,6,7,8")
           .split(",")
           .map((s) => Number(s))
           .filter((n) => Number.isFinite(n) && n > 0);
         i++;
         break;
       case "--robustness-depths":
-        opts.robustnessDepths = (next() ?? "1,2,3,4,5,6,7,8")
+        opts.robustnessDepths = (next() ?? "1,2,3,4,5,6,7,8,9,10,11")
           .split(",")
           .map((s) => Number(s))
           .filter((n) => Number.isFinite(n) && n > 0);
@@ -82,7 +83,7 @@ function parseArgs(argv: string[]): CliOptions {
         i++;
         break;
       case "--puzzles":
-        opts.puzzles = (next() ?? "cube,megaminx").split(",") as PuzzleId[];
+        opts.puzzles = (next() ?? "cube,pyraminx").split(",") as PuzzleId[];
         i++;
         break;
       case "--algorithms":
@@ -94,25 +95,26 @@ function parseArgs(argv: string[]): CliOptions {
         i++;
         break;
       case "--out":
-        opts.out = resolve(process.cwd(), next() ?? "src/data/results.json");
+        opts.out = resolve(process.cwd(), next() ?? "reports/results.json");
         i++;
         break;
       case "--help":
       case "-h": {
         console.log(`
-Benchmark RL : Q-learning, Double Q-learning, MDP — cube 3x3x3 et Megaminx.
+Benchmark RL : Q-learning, Double Q-learning, MDP — cube 3x3x3 et Pyraminx.
 
 Options :
-  --max-depth N     profondeur maximale du curriculum (defaut 5)
+  --max-depth N     profondeur maximale du curriculum (defaut 8)
   --depths a,b,c    liste explicite des profondeurs testees
-  --robustness-depths a,b,c  profondeurs de l'etude de robustesse (defaut 1..8)
+  --robustness-depths a,b,c  profondeurs de l'etude de robustesse (defaut 1..11)
   --trials N        essais par cellule du tableau (defaut 80)
-  --episodes N      budget maximal d'episodes par agent (defaut 400000)
+  --episodes N      budget maximal d'episodes par agent (defaut : profil du puzzle)
   --max-states N    plafond de la table Q en etats (defaut 1000000)
-  --puzzles l       cube,megaminx separes par une virgule
+  --puzzles l       cube,pyraminx separes par une virgule
   --algorithms l    q,dq,mdp separes par une virgule
   --seed N          graine pseudo-aleatoire (defaut 12345)
-  --out PATH        fichier de sortie (defaut src/data/results.json)
+  --out PATH        fichier de sortie (defaut reports/results.json)
+                    les CSV sont ecrits dans le meme dossier
 `);
         process.exit(0);
       }
@@ -129,7 +131,7 @@ function machine(label: string, value: number): string {
 
 async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
-  const labelLine = `puzzles=${opts.puzzles.join("+")} maxDepth=${Math.max(...opts.depths)} trials=${opts.trials} episodes=${opts.maxEpisodes} seed=${opts.seed}`;
+  const labelLine = `puzzles=${opts.puzzles.join("+")} maxDepth=${Math.max(...opts.depths)} trials=${opts.trials} episodes=${opts.maxEpisodes ?? "auto"} seed=${opts.seed}`;
   console.log(`Benchmark RL — ${labelLine}`);
   console.log("");
 
@@ -203,22 +205,30 @@ async function main(): Promise<void> {
       `(${machine("durée totale", (Date.now() - startedAt) / 1000)} s)`,
   );
 
-  const megaDepth3 = result.cells.filter((c) => c.puzzle === "megaminx" && c.depth === 3);
-  const mqAt3 = megaDepth3.find((c) => c.algorithm === "q");
-  const mdqAt3 = megaDepth3.find((c) => c.algorithm === "dq");
-  const mmol = megaDepth3.find((c) => c.algorithm === "mdp");
-  if (mqAt3) {
+  const pyraDepth8 = result.cells.filter((c) => c.puzzle === "pyraminx" && c.depth === 8);
+  const pqAt8 = pyraDepth8.find((c) => c.algorithm === "q");
+  const pdqAt8 = pyraDepth8.find((c) => c.algorithm === "dq");
+  const pmol = pyraDepth8.find((c) => c.algorithm === "mdp");
+  if (pqAt8) {
+    const fmt = (v: number | undefined) => (v === undefined ? "—" : `${Math.round(v * 100)} %`);
     console.log(
-      `Acceptation megaminx profondeur 3 : Q=${mqAt3 ? Math.round(mqAt3.successRate * 100) : "—"} % ` +
-        `DQ=${mdqAt3 ? Math.round(mdqAt3.successRate * 100) : "—"} % ` +
-        `MDP=${mmol ? Math.round(mmol.successRate * 100) : "—"} %`,
+      `Acceptation pyraminx profondeur 8 : Q=${fmt(pqAt8.successRate)} (planif. ${fmt(pqAt8.planningSuccessRate)}) ` +
+        `DQ=${fmt(pdqAt8?.successRate)} (planif. ${fmt(pdqAt8?.planningSuccessRate)}) ` +
+        `MDP=${fmt(pmol?.successRate)}`,
     );
   }
 
   const outPath = opts.out;
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, JSON.stringify(result, null, 2), "utf8");
+  const outDir = dirname(outPath);
+  const csvPath = resolve(outDir, "benchmark.csv");
+  const robustnessPath = resolve(outDir, "robustness.csv");
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(outPath, benchmarkToJson(result), "utf8");
+  writeFileSync(csvPath, benchmarkToCsv(result), "utf8");
+  writeFileSync(robustnessPath, robustnessToCsv(result), "utf8");
   console.log(`Écrit dans ${outPath}`);
+  console.log(`Écrit dans ${csvPath}`);
+  console.log(`Écrit dans ${robustnessPath}`);
 }
 
 main().catch((error: unknown) => {

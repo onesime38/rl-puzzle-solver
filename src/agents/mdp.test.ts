@@ -1,35 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { buildCube, buildMegaminx } from "../engine";
+import { buildCube, buildPyraminx } from "../engine";
 import { mulberry32 } from "../engine/rng";
 import { MDPAgent } from "./mdp";
+import { PYRAMINX_STATES, PyraminxMDPAgent } from "./mdpPyraminx";
 
-describe("MDPAgent", () => {
-  it("builds a graph and runs value iteration to convergence", () => {
-    const agent = new MDPAgent(buildMegaminx(), { maxDepth: 2, gamma: 0.95, slip: 0.05 });
+describe("MDPAgent (cube)", () => {
+  it("builds a depth-limited graph and runs value iteration", () => {
+    const agent = new MDPAgent(buildCube(), { maxDepth: 2 });
     const { states, iterations } = agent.build();
     expect(states).toBeGreaterThan(1);
     expect(iterations).toBeGreaterThan(0);
     expect(agent.deltas[agent.deltas.length - 1]).toBeLessThan(1e-6);
-    expect(agent.iterations).toBeGreaterThanOrEqual(iterations);
   });
 
   it("reports the exact size of the depth-limited graph", () => {
-    const mega = buildMegaminx();
     const cube = buildCube();
-    expect(new MDPAgent(mega, { maxDepth: 1 }).build().states).toBe(1 + mega.nA);
     // Solved state + the 12 neighbours produced by the first move.
     expect(new MDPAgent(cube, { maxDepth: 1 }).build().states).toBe(13);
   });
 
   it("contains every depth-1 scramble in its graph", () => {
-    const mega = buildMegaminx();
-    const agent = new MDPAgent(mega, { maxDepth: 1 });
+    const cube = buildCube();
+    const agent = new MDPAgent(cube, { maxDepth: 1 });
     agent.build();
-    expect(agent.indexOf(mega.scramble(1, mulberry32(1)))).toBeGreaterThanOrEqual(0);
+    expect(agent.indexOf(cube.scramble(1, mulberry32(1)))).toBeGreaterThanOrEqual(0);
   });
 
-  it("solves every depth-1 megaminx scramble optimally", () => {
-    const agent = new MDPAgent(buildMegaminx(), { maxDepth: 1 });
+  it("solves every depth-1 cube scramble optimally", () => {
+    const agent = new MDPAgent(buildCube(), { maxDepth: 1 });
     agent.build();
     const rng = mulberry32(11);
     for (let i = 0; i < 20; i++) {
@@ -55,4 +53,20 @@ describe("MDPAgent", () => {
       expect(deltas[i]).toBeLessThanOrEqual(deltas[i - 1] + 1e-12);
     }
   });
+});
+
+describe("PyraminxMDPAgent", () => {
+  it(
+    "enumerates the full 933 120-state graph and solves optimally",
+    { timeout: 300_000 },
+    () => {
+      const agent = new PyraminxMDPAgent(buildPyraminx());
+      const { states, iterations, cancelled } = agent.build();
+      expect(cancelled).toBe(false);
+      expect(states).toBe(PYRAMINX_STATES);
+      expect(iterations).toBeGreaterThan(0);
+      expect(agent.solve(agent.puzzle.solved.slice()).solved).toBe(true);
+      expect(agent.evaluateStats(1, 20).rate).toBe(1);
+    },
+  );
 });

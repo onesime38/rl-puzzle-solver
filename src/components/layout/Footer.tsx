@@ -4,10 +4,7 @@ import "./footer.css";
 
 const ROUTES = [
   { to: "/", label: "Accueil" },
-  { to: "/simulateur/cube", label: "Simulateur — Cube" },
-  { to: "/simulateur/megaminx", label: "Simulateur — Megaminx" },
-  { to: "/algorithmes", label: "Algorithmes" },
-  { to: "/resultats", label: "Résultats" },
+  { to: "/simulateur", label: "Simulateur" },
   { to: "/a-propos", label: "À propos" },
 ];
 
@@ -30,29 +27,10 @@ export function Footer() {
               ))}
             </ul>
           </nav>
-          <div>
-            <h4>Informations académiques</h4>
-            <ul className="site-footer__academic">
-              <li>{PROJECT.degree}</li>
-              <li>{PROJECT.institution}</li>
-              <li>Module : {PROJECT.module}</li>
-              <li>Année universitaire : {PROJECT.academicYear}</li>
-            </ul>
-            <h4>Équipe</h4>
-            <ul>
-              {PROJECT.team.map((member) => (
-                <li key={member}>{member}</li>
-              ))}
-            </ul>
-          </div>
         </div>
         <div className="site-footer__bar">
           <span>{CONTACT}</span>
           <span>
-            <a href={PROJECT.repository} target="_blank" rel="noreferrer">
-              Dépôt du projet
-            </a>
-            <span aria-hidden="true"> · </span>
             <a href="#top">Haut de page</a>
           </span>
         </div>

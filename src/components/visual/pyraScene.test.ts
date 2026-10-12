@@ -1,28 +1,23 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { buildMegaminx } from "../../engine";
-import { displayedColors as engineColors } from "./minxGeometry";
-import { buildMegaminxScene } from "./minxScene";
+import { buildPyraminx } from "../../engine";
+import { displayedColors as engineColors } from "./pyraGeometry";
+import { buildPyraminxScene } from "./pyraScene";
 
 /**
- * The Megaminx 3D scene is split in two: a framework-free Three.js model
- * (`minxScene`) that owns all transforms, and a thin React component that owns
+ * The Pyraminx 3D scene is split in two: a framework-free Three.js model
+ * (`pyraScene`) that owns all transforms, and a thin React component that owns
  * the WebGL renderer. These tests exercise the model directly — no WebGL
- * context is created (the renderer is the only WebGL part, and it is not part
- * of the model), which is the "WebGL mocked" guarantee: the display logic is
- * verified without a GPU.
- *
- * Invariant under test: the 132 sticker meshes and the 12 caps NEVER move
- * permanently. Whatever the sequence (instant, animated, interrupted, reset),
- * every mesh ends back in `root` with its rest transform, and the displayed
- * colours equal the engine state.
+ * context is created. Invariant under test: the 36 sticker meshes and the 4
+ * caps NEVER move permanently. Whatever the sequence (instant, animated,
+ * interrupted, reset), every mesh ends back in `root` with its rest transform,
+ * and the displayed colours equal the engine state.
  */
 
-const puzzle = buildMegaminx();
+const puzzle = buildPyraminx();
 
-type Model = ReturnType<typeof buildMegaminxScene>;
+type Model = ReturnType<typeof buildPyraminxScene>;
 
-/** Deterministic PRNG so failures are reproducible. */
 function lcg(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
@@ -45,10 +40,10 @@ function expectAtRest(model: Model): void {
       dev = Math.max(dev, Math.abs(mesh.matrixWorld.elements[k] - world[k]));
     }
   }
-  for (let g = 0; g < model.caps.length; g++) {
-    const cap = model.caps[g];
-    if (cap.parent !== model.root) orphans.push(`cap ${g}`);
-    const rest = model.capRest[g].elements;
+  for (let v = 0; v < model.caps.length; v++) {
+    const cap = model.caps[v];
+    if (cap.parent !== model.root) orphans.push(`cap ${v}`);
+    const rest = model.capRest[v].elements;
     for (let k = 0; k < 16; k++) {
       dev = Math.max(dev, Math.abs(cap.matrix.elements[k] - rest[k]));
     }
@@ -61,11 +56,11 @@ function expectColors(model: Model, expected: Uint8Array): void {
   expect(model.displayedColors()).toEqual(engineColors(puzzle, expected));
 }
 
-describe("megaminx scene model", () => {
+describe("pyraminx scene model", () => {
   let model: Model;
 
   beforeAll(() => {
-    model = buildMegaminxScene(puzzle);
+    model = buildPyraminxScene(puzzle);
   });
   beforeEach(() => {
     model.reset();
@@ -78,6 +73,9 @@ describe("megaminx scene model", () => {
     const identity = new THREE.Matrix4();
     for (let i = 0; i < model.stickerRest.length; i++) {
       expect(model.stickerRest[i].equals(identity)).toBe(true);
+    }
+    for (let v = 0; v < model.capRest.length; v++) {
+      expect(model.capRest[v].equals(identity)).toBe(true);
     }
   });
 
@@ -122,25 +120,24 @@ describe("megaminx scene model", () => {
   it("restores rest transforms when an animation is interrupted (cancel)", () => {
     const before = model.getState();
     for (let t = 0; t < 20; t++) {
-      const a = (t * 5 + 1) % puzzle.nA;
+      const a = (t * 3 + 1) % puzzle.nA;
       model.beginMove(a);
       model.setProgress(0.42);
       model.cancelMove();
       expectAtRest(model);
       expectColors(model, before);
     }
-    // A normal move still works after many interrupts.
-    model.beginMove(7);
+    model.beginMove(5);
     model.setProgress(0.6);
     model.setProgress(1);
     model.commitMove();
-    expectColors(model, puzzle.apply(before, 7));
+    expectColors(model, puzzle.apply(before, 5));
     expectAtRest(model);
   });
 
   it("restores rest transforms when reset mid-animation (queue/timeout)", () => {
     for (let t = 0; t < 20; t++) {
-      const a = (t * 3 + 2) % puzzle.nA;
+      const a = (t * 5 + 2) % puzzle.nA;
       model.beginMove(a);
       model.setProgress(0.3);
       model.reset();
@@ -150,11 +147,9 @@ describe("megaminx scene model", () => {
   });
 
   it("stays at rest when a second move begins before the first is committed", () => {
-    model.beginMove(3);
+    model.beginMove(1);
     model.setProgress(0.5);
-    // The component serializes moves, but the model itself must never leak a
-    // displaced layer even if called this way.
-    model.beginMove(9);
+    model.beginMove(6);
     model.setProgress(0.5);
     model.cancelMove();
     expectAtRest(model);

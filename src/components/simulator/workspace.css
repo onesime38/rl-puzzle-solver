@@ -268,12 +268,6 @@
   font-size: var(--fs-s);
 }
 
-.workspace__compare {
-  margin-top: var(--sp-6);
-  padding-top: var(--sp-5);
-  border-top: var(--border);
-}
-
 @media (max-width: 940px) {
   .workspace {
     grid-template-columns: 1fr;

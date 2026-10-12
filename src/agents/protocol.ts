@@ -14,9 +14,9 @@ export type WorkerRequest =
   | { type: "start"; id?: number; maxEpisodes?: number }
   | { type: "pause"; id?: number }
   | { type: "reset"; id?: number }
-  | { type: "solve"; id: number; state: number[]; maxSteps?: number }
-  | { type: "evaluate"; id: number; depth: number; trials?: number }
-  | { type: "benchmark"; id: number; config: BenchmarkConfig };
+  | { type: "solve"; id: number; state: number[]; maxSteps?: number; horizon?: number }
+  | { type: "evaluate"; id: number; depth: number; trials?: number; horizon?: number }
+  | { type: "benchmark"; id: number; config: BenchmarkConfig; planningHorizon?: number };
 
 /** Responses sent from the training worker to the main thread. */
 export type WorkerResponse =
@@ -27,7 +27,8 @@ export type WorkerResponse =
   | { type: "training-complete"; reason: "converged" | "budget" | "memory" | "paused"; episode: number; states: number; maxRate: number }
   | { type: "training-paused"; id?: number }
   | { type: "reset-done"; id?: number }
-  | { type: "mdp-built"; id?: number; states: number; iterations: number; deltas: number[] }
+  | { type: "mdp-built"; id?: number; states: number; iterations: number; deltas: number[]; cancelled?: boolean }
+  | { type: "mdp-progress"; phase: "graph" | "iteration"; states: number; iterations: number }
   | { type: "solve-result"; id: number; result: SolveResult }
   | { type: "eval-result"; id: number; depth: number; stats: EvaluationStats }
   | { type: "benchmark-result"; id: number; result: BenchmarkResult }

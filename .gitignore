@@ -6,3 +6,6 @@ dist-ssr
 .vite
 coverage
 results/
+reports/
+
+*.log

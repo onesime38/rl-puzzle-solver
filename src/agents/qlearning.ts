@@ -1,6 +1,6 @@
 import type { Puzzle } from "../engine";
 import { resolveRng, type Rng } from "../engine/rng";
-import { QStore } from "./qstore";
+import { createQStore, type QTableStore } from "./qstore";
 import type {
   AgentParams,
   EvaluationStats,
@@ -13,13 +13,21 @@ export type QAlgorithm = "q" | "dq";
 
 /**
  * Tabular Q-learning / Double Q-learning agent with curriculum learning,
- * pessimistic initialisation and retrospective replay (section 7 of the brief).
+ * pessimistic initialisation and retrospective replay.
+ *
+ * The Q-values are stored in a {@link QTableStore}. For the Pyraminx that store
+ * is a typed-array hash table (no `Map`, no per-state object), which keeps the
+ * whole tabular agent well within the memory budget.
+ *
+ * An optional bounded **look-ahead** (planification à horizon `k`) evaluates the
+ * agent's Q-values `k` plies deep, which lets a policy trained to depth `d`
+ * solve scrambles up to depth `d + k`.
  */
 export class QAgent {
   readonly puzzle: Puzzle;
   readonly algo: QAlgorithm;
   readonly params: AgentParams;
-  readonly store: QStore;
+  readonly store: QTableStore;
 
   private readonly rng: Rng;
   private readonly init: number;
@@ -37,7 +45,7 @@ export class QAgent {
     this.params = { ...DEFAULT_PARAMS, ...params };
     this.init = this.params.init;
     this.rng = resolveRng(this.params.seed);
-    this.store = new QStore(puzzle.nA, this.init, this.params.maxStates);
+    this.store = createQStore(puzzle, puzzle.nA, this.init, this.params.maxStates);
   }
 
   /** True when the memory cap has been reached. */
@@ -122,10 +130,10 @@ export class QAgent {
     return { table: updated, value: done ? r : r + this.params.gamma * o[off + bestAction] };
   }
 
-  /** Applies one learning update to the transition `(key, a) -> (key2, done)`. */
-  private update(key: string, a: number, key2: string, done: boolean): void {
-    const row = this.store.ensure(key);
-    const row2 = this.store.ensure(key2);
+  /** Applies one learning update to the transition `(state, a) -> (next, done)`. */
+  private update(state: Uint8Array, a: number, next: Uint8Array, done: boolean): void {
+    const row = this.store.ensure(state);
+    const row2 = this.store.ensure(next);
     if (row < 0 || row2 < 0) return;
     const { table, value: target } = this.target(row2, done);
     const off = row * this.puzzle.nA + a;
@@ -155,7 +163,7 @@ export class QAgent {
     }
     for (let i = depth; i >= 1; i--) {
       const done = P.isSolved(trajectory[i - 1]);
-      this.update(P.key(trajectory[i]), P.inv(actions[i - 1]), P.key(trajectory[i - 1]), done);
+      this.update(trajectory[i], P.inv(actions[i - 1]), trajectory[i - 1], done);
     }
   }
 
@@ -168,32 +176,61 @@ export class QAgent {
     this.replay(d);
 
     let state = P.scramble(d, this.rng);
-    let key = P.key(state);
     if (P.isSolved(state)) {
       this.episodes++;
       return;
     }
     for (let t = 0; t < maxSteps; t++) {
-      const row = this.store.ensure(key);
+      const row = this.store.ensure(state);
       if (row < 0) return;
       let a = this.rng() < this.epsNow ? this.randInt(P.nA) : this.bestAction(row);
       if (this.rng() < this.params.slip) a = this.randInt(P.nA);
       const next = P.apply(state, a);
-      const nextKey = P.key(next);
       const done = P.isSolved(next);
-      this.update(key, a, nextKey, done);
+      this.update(state, a, next, done);
       state = next;
-      key = nextKey;
       if (done) break;
     }
     this.episodes++;
   }
 
+  /** Best value estimate of `state` (max over actions), or the pessimistic init. */
+  private stateValue(state: Uint8Array): number {
+    const row = this.store.indexOf(state);
+    if (row < 0) return this.init;
+    const nA = this.puzzle.nA;
+    let best = -Infinity;
+    for (let a = 0; a < nA; a++) {
+      const v = this.valueAt(row, a);
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
   /**
-   * Selects a solution from the current state, avoiding already-visited states
-   * and stopping after `maxSteps` moves.
+   * Bounded look-ahead value: maximum discounted return over every action
+   * sequence of length `h`, with the learned value as a leaf estimate.
    */
-  solve(state: Uint8Array, maxSteps = 40): SolveResult {
+  private planValue(state: Uint8Array, h: number): number {
+    const P = this.puzzle;
+    if (P.isSolved(state)) return 0;
+    if (h <= 0) return this.stateValue(state);
+    let best = -Infinity;
+    for (let a = 0; a < P.nA; a++) {
+      const v = -1 + this.params.gamma * this.planValue(P.apply(state, a), h - 1);
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
+  /**
+   * Selects a solution from the current state.
+   *
+   * `horizon > 0` enables the explicit look-ahead planner: at each step the best
+   * action is chosen by evaluating `horizon` plies ahead. `horizon = 0` is the
+   * pure greedy policy (the historical behaviour).
+   */
+  solve(state: Uint8Array, maxSteps = 40, horizon = 0): SolveResult {
     const P = this.puzzle;
     const path: number[] = [];
     let current = state;
@@ -201,40 +238,60 @@ export class QAgent {
 
     for (let t = 0; t < maxSteps; t++) {
       if (P.isSolved(current)) return { solved: true, path };
-      const row = this.store.indexOf(P.key(current));
-      if (row < 0) break;
-      const order = Array.from({ length: P.nA }, (_, a) => a).sort(
-        (x, y) => this.valueAt(row, y) - this.valueAt(row, x) + (this.rng() - 0.5) * 1e-6,
-      );
-      let moved = false;
-      for (const a of order) {
-        const next = P.apply(current, a);
-        const key = P.key(next);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        path.push(a);
-        current = next;
-        moved = true;
-        break;
+      const row = this.store.indexOf(current);
+      if (row < 0 && horizon <= 0) break;
+
+      let action = -1;
+      if (horizon > 0) {
+        let best = -Infinity;
+        for (let a = 0; a < P.nA; a++) {
+          const next = P.apply(current, a);
+          const v = -1 + this.params.gamma * this.planValue(next, horizon - 1);
+          if (v > best) {
+            best = v;
+            action = a;
+          }
+        }
+      } else {
+        const order = Array.from({ length: P.nA }, (_, a) => a).sort(
+          (x, y) => this.valueAt(row, y) - this.valueAt(row, x) + (this.rng() - 0.5) * 1e-6,
+        );
+        for (const a of order) {
+          if (!seen.has(P.key(P.apply(current, a)))) {
+            action = a;
+            break;
+          }
+        }
       }
-      if (!moved) break;
+      if (action < 0) break;
+
+      const next = P.apply(current, action);
+      const key = P.key(next);
+      if (horizon <= 0) {
+        if (seen.has(key)) break;
+        seen.add(key);
+      } else {
+        seen.add(key);
+      }
+      path.push(action);
+      current = next;
     }
     return { solved: P.isSolved(current), path };
   }
 
   /** Success rate over `trials` random scrambles of the given depth. */
-  evaluate(depth: number, trials = 80): EvaluationStats {
-    return this.evaluateStats(depth, trials);
+  evaluate(depth: number, trials = 80, horizon = 0): EvaluationStats {
+    return this.evaluateStats(depth, trials, horizon);
   }
 
-  evaluateStats(depth: number, trials = 80): EvaluationStats {
+  evaluateStats(depth: number, trials = 80, horizon = 0): EvaluationStats {
     const P = this.puzzle;
     const maxSteps = Math.max(40, (this.params.stepMul ?? 3) * depth + (this.params.stepAdd ?? 6));
     let ok = 0;
     let moves = 0;
     const start = now();
     for (let i = 0; i < trials; i++) {
-      const result = this.solve(P.scramble(depth, this.rng), maxSteps);
+      const result = this.solve(P.scramble(depth, this.rng), maxSteps, horizon);
       if (result.solved) {
         ok++;
         moves += result.path.length;

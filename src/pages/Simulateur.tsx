@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { buildCube, CUBE_COLORS } from "../engine";
-import { MegaminxGlyph } from "../components/MegaminxGlyph";
+import { PyraminxGlyph } from "../components/PyraminxGlyph";
 import "./simulateur.css";
 
 const cube = buildCube();
@@ -94,13 +94,13 @@ export function SimulateurPage() {
           </div>
         </Link>
 
-        <Link to="/simulateur/megaminx" className="puzzle-card">
-          <MegaminxGlyph className="preview" />
+        <Link to="/simulateur/pyraminx" className="puzzle-card">
+          <PyraminxGlyph className="preview" />
           <div>
-            <h2>Megaminx</h2>
+            <h2>Pyraminx (tétraèdre)</h2>
             <p>
-              132 étiquettes, 12 faces pentagonales, 24 rotations (F0, F0′, F1, F1′, …). Vue 3D
-              animée, coups à la souris.
+              36 étiquettes, 4 faces triangulaires, 8 rotations (U, U′, L, L′, R, R′, B, B′).
+              Vue 3D animée, coups à la souris.
             </p>
             <span className="btn btn--primary btn--sm">Ouvrir l'espace de travail</span>
           </div>
@@ -108,8 +108,7 @@ export function SimulateurPage() {
       </div>
 
       <p className="small muted">
-        Précédent : <Link to="/">Accueil</Link>. Explications théoriques :{" "}
-        <Link to="/algorithmes">Algorithmes</Link>.
+        Précédent : <Link to="/">Accueil</Link>.
       </p>
     </div>
   );

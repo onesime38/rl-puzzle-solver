@@ -8,11 +8,10 @@ import {
   type EvaluationStats,
   type PuzzleId,
 } from "../../agents";
-import { ALGORITHM_LABELS, results } from "../../data/results";
-import { buildCube, buildMegaminx, type Puzzle } from "../../engine";
+import { buildCube, buildPyraminx, type Puzzle } from "../../engine";
 import { useSolverTask } from "../../lib/useSolverTask";
 import { CubeView } from "../visual/CubeView";
-import { MegaminxView } from "../visual/MegaminxView";
+import { PyraminxView } from "../visual/PyraminxView";
 import type { PuzzleViewHandle } from "../visual/types";
 import { DeltasChart, LearningChart } from "./charts";
 import "./workspace.css";
@@ -30,16 +29,11 @@ const REASON_LABELS: Record<string, string> = {
   paused: "Entraînement en pause",
 };
 
-/** Training-depth cap per puzzle/algorithm (Megaminx: Q/DQ to 3, MDP to 4). */
+/** Training-depth cap per puzzle/algorithm (Pyraminx: Q/DQ to 8, MDP complete graph). */
 function maxDepthCap(puzzleId: PuzzleId, algo: Algorithm): number {
-  if (puzzleId !== "megaminx") return 6;
-  return algo === "mdp" ? 4 : 3;
+  if (puzzleId === "pyraminx") return algo === "mdp" ? 11 : 8;
+  return 6;
 }
-
-const DEPTHS_BY_PUZZLE: Record<PuzzleId, number[]> = {
-  cube: [1, 2, 3, 4, 5],
-  megaminx: [1, 2, 3, 4],
-};
 
 function MoveTokens({
   moves,
@@ -79,50 +73,9 @@ function scrambleMoves(puzzle: Puzzle, depth: number): number[] {
   return moves;
 }
 
-function ComparisonTable({ puzzleId, depths }: { puzzleId: PuzzleId; depths: number[] }) {
-  const maxDepth = Math.max(...depths);
-  return (
-    <div className="table-wrap">
-      <table className="data">
-        <caption>
-          Mesures du benchmark (réelles, issues de <code>src/data/results.json</code>) pour ce
-          puzzle.
-        </caption>
-        <thead>
-          <tr>
-            <th scope="col">Algorithme</th>
-            {depths.map((d) => (
-              <th scope="col" key={d}>
-                Prof. {d}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(["q", "dq", "mdp"] as Algorithm[]).map((algo) => (
-            <tr key={algo}>
-              <th scope="row">{ALGORITHM_LABELS[algo]}</th>
-              {depths.map((d) => {
-                const cell = results.cells.find(
-                  (c) => c.puzzle === puzzleId && c.algorithm === algo && c.depth === d,
-                );
-                return (
-                  <td key={d} className="num">
-                    {d <= maxDepth && cell ? `${Math.round(cell.successRate * 100)} %` : "—"}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
   const puzzle: Puzzle = useMemo(
-    () => (puzzleId === "cube" ? buildCube() : buildMegaminx()),
+    () => (puzzleId === "cube" ? buildCube() : buildPyraminx()),
     [puzzleId],
   );
   const profile = useMemo(() => agentParamsFor(puzzleId, {}), [puzzleId]);
@@ -131,10 +84,12 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
   const { state } = task;
 
   const [algo, setAlgo] = useState<Algorithm>("q");
-  const [maxDepth, setMaxDepth] = useState(puzzleId === "cube" ? 4 : 3);
+  const [maxDepth, setMaxDepth] = useState(puzzleId === "cube" ? 4 : 8);
   const [maxEpisodes, setMaxEpisodes] = useState(
-    puzzleId === "cube" ? 400_000 : PUZZLE_PROFILES.megaminx.maxEpisodes ?? 120_000,
+    puzzleId === "cube" ? 400_000 : PUZZLE_PROFILES.pyraminx.maxEpisodes ?? 3_000_000,
   );
+  const [planning, setPlanning] = useState(puzzleId === "pyraminx");
+  const [horizon, setHorizon] = useState(PUZZLE_PROFILES.pyraminx.planningHorizon ?? 4);
   const [advanced, setAdvanced] = useState({
     alpha: DEFAULT_PARAMS.alpha,
     gamma: DEFAULT_PARAMS.gamma,
@@ -145,7 +100,7 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
   const [speed, setSpeed] = useState(260);
 
   const [logical, setLogical] = useState<Uint8Array>(() => puzzle.solved);
-  const [scrambleDepth, setScrambleDepth] = useState(puzzleId === "cube" ? 4 : 3);
+  const [scrambleDepth, setScrambleDepth] = useState(puzzleId === "cube" ? 4 : 8);
   const [expertMode, setExpertMode] = useState(false);
   const [trainedDepth, setTrainedDepth] = useState<number | null>(null);
   const mdpDepthRef = useRef<number | null>(null);
@@ -225,14 +180,14 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
     );
   }
 
-  async function handleScramble() {
+  async function runScramble(depth: number) {
     if (busy || !viewRef.current) return;
     setBusy(true);
     setNotice(null);
     setSolutionList(null);
     setEvalStats(null);
     viewRef.current.reset();
-    const moves = scrambleMoves(puzzle, scrambleDepth);
+    const moves = scrambleMoves(puzzle, depth);
     setScrambleList(moves);
     let s = puzzle.solved;
     for (let i = 0; i < moves.length; i++) {
@@ -245,12 +200,24 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
     setBusy(false);
   }
 
+  async function handleScramble() {
+    await runScramble(scrambleDepth);
+  }
+
+  /** Uniform-random state: a long scramble at the puzzle diameter (11 for the Pyraminx). */
+  async function handleScrambleUniform() {
+    const depth = 11;
+    setScrambleDepth(depth);
+    await runScramble(depth);
+  }
+
   async function handleSolve() {
     if (busy || !viewRef.current) return;
     setBusy(true);
     setNotice(null);
     setEvalStats(null);
-    const result = await task.solve(logical, Math.max(60, scrambleDepth * 4 + 10));
+    const h = planning && algo !== "mdp" ? horizon : 0;
+    const result = await task.solve(logical, Math.max(60, scrambleDepth * 4 + 10), h);
     if (result.outside) {
       setNoticeWarn(true);
       setNotice(
@@ -283,7 +250,8 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
     if (busy) return;
     setBusy(true);
     setEvalStats(null);
-    const stats = await task.evaluate(scrambleDepth, 80);
+    const h = planning && algo !== "mdp" ? horizon : 0;
+    const stats = await task.evaluate(scrambleDepth, 80, h);
     setEvalStats(stats);
     setBusy(false);
   }
@@ -354,9 +322,9 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
           {puzzleId === "cube" ? (
             <CubeView ref={viewRef} puzzle={puzzle as ReturnType<typeof buildCube>} />
           ) : (
-            <MegaminxView
+            <PyraminxView
               ref={viewRef}
-              puzzle={puzzle as ReturnType<typeof buildMegaminx>}
+              puzzle={puzzle as ReturnType<typeof buildPyraminx>}
               onPickFace={handleManualMove}
             />
           )}
@@ -393,6 +361,11 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
             <button type="button" className="btn" onClick={handleScramble} disabled={busy}>
               Mélanger
             </button>
+            {puzzleId === "pyraminx" ? (
+              <button type="button" className="btn" onClick={handleScrambleUniform} disabled={busy}>
+                Mélange aléatoire (état uniforme)
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn--primary"
@@ -429,6 +402,30 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
             />
           </div>
 
+          {puzzleId === "pyraminx" && algo !== "mdp" ? (
+            <div className="planning-controls">
+              <label className="field field--toggle">
+                <input
+                  type="checkbox"
+                  checked={planning}
+                  onChange={(e) => setPlanning(e.target.checked)}
+                />
+                <span>Planification à horizon k (recherche bornée sur la table Q)</span>
+              </label>
+              <label className="field">
+                <span>Horizon k</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={horizon}
+                  disabled={!planning}
+                  onChange={(e) => setHorizon(Math.max(1, Math.min(5, Number(e.target.value) || 4)))}
+                />
+              </label>
+            </div>
+          ) : null}
+
           <dl className="move-log">
             <div>
               <dt>Mélange</dt>
@@ -458,14 +455,14 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
             </div>
           </dl>
 
-          {puzzleId === "megaminx" ? (
+          {puzzleId === "pyraminx" ? (
             <div className="manual-moves" aria-label="Coups manuels">
               <h3>Coups manuels</h3>
               <div className="manual-moves__grid">
-                {Array.from({ length: 12 }, (_, g) => (
-                  <div key={g} className="manual-moves__face">
+                {["U", "L", "R", "B"].map((vertex, v) => (
+                  <div key={vertex} className="manual-moves__face">
                     {[0, 1].map((d) => {
-                      const a = 2 * g + d;
+                      const a = 2 * v + d;
                       return (
                         <button
                           key={a}
@@ -599,7 +596,7 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
             >
               {algo === "mdp" ? "Construire le graphe" : "Entraîner"}
             </button>
-            <button type="button" className="btn" onClick={task.pause} disabled={state.phase !== "training"}>
+            <button type="button" className="btn" onClick={task.pause} disabled={!training}>
               Pause
             </button>
             <button
@@ -693,16 +690,6 @@ export function Workspace({ puzzleId }: { puzzleId: PuzzleId }) {
           {state.mdp ? <DeltasChart deltas={state.mdp.deltas} /> : null}
         </section>
       </div>
-
-      <section className="workspace__compare">
-        <h2>Comparaison des algorithmes</h2>
-        <ComparisonTable puzzleId={puzzleId} depths={DEPTHS_BY_PUZZLE[puzzleId]} />
-        <p className="note note--warn">
-          {puzzleId === "cube"
-            ? "Le cube est résolu de façon fiable par le Q-learning tabulaire jusqu'à 4 coups ; au-delà, la table devient trop grande (limite du Q-learning tabulaire). Le MDP exact reste parfait mais énumère tout le graphe."
-            : "Le Megaminx est résolu de façon fiable par le Q-learning tabulaire jusqu'à 3 coups et par le MDP exact jusqu'à 4 coups ; au-delà, le graphe devient trop grand (limite du Q-learning tabulaire)."}
-        </p>
-      </section>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 export type Algorithm = "q" | "dq" | "mdp";
-export type PuzzleId = "cube" | "megaminx";
+export type PuzzleId = "cube" | "pyraminx";
 
 /** Hyper-parameters shared by the tabular agents. */
 export interface AgentParams {
@@ -44,15 +44,18 @@ export const DEFAULT_PARAMS: AgentParams = {
 };
 
 /**
- * Per-puzzle learning profile. The Megaminx has about 10⁶⁸ states, so tabular
- * learning only works on a bounded curriculum: Q-learning / Double Q-learning
- * converge at depth 3 (ε = 0.2, short episodes), while the MDP — which
- * enumerates the explicit graph — is run up to depth 4.
+ * Per-puzzle learning profile.
+ *
+ * The Pyraminx has exactly 933,120 states and diameter 11, so the tabular
+ * Q-learning / Double Q-learning curriculum is trained to depth 8 (ε = 0.2,
+ * short episodes `1·d + 3`), and the bounded look-ahead planner (`planningHorizon`
+ * extra plies) then reaches the full diameter: 8 + 4 = 12 ≥ 11. The MDP, which
+ * enumerates the complete graph, is built once for all 933,120 states.
  */
 export interface PuzzleProfile {
   /** Default `maxDepth` for Q-learning and Double Q-learning. */
   maxDepth: number;
-  /** Maximum depth for the explicit MDP graph. */
+  /** Maximum depth for the explicit MDP graph (the Pyraminx diameter is 11). */
   mdpMaxDepth: number;
   stepMul: number;
   stepAdd: number;
@@ -61,6 +64,8 @@ export interface PuzzleProfile {
   targetRate?: number;
   stopRate?: number;
   maxEpisodes?: number;
+  /** Look-ahead horizon used to evaluate the planner on top of a trained agent. */
+  planningHorizon?: number;
 }
 
 export const PUZZLE_PROFILES: Record<PuzzleId, PuzzleProfile> = {
@@ -72,16 +77,17 @@ export const PUZZLE_PROFILES: Record<PuzzleId, PuzzleProfile> = {
     eps: 0.3,
     epsFinal: 0.15,
   },
-  megaminx: {
-    maxDepth: 3,
-    mdpMaxDepth: 4,
+  pyraminx: {
+    maxDepth: 8,
+    mdpMaxDepth: 11,
     stepMul: 1,
     stepAdd: 3,
     eps: 0.2,
     epsFinal: 0.2,
-    targetRate: 0.95,
+    targetRate: 0.9,
     stopRate: 0.95,
-    maxEpisodes: 120_000,
+    maxEpisodes: 3_000_000,
+    planningHorizon: 4,
   },
 };
 
@@ -137,6 +143,14 @@ export interface BenchmarkCell {
   iters: number;
   /** Total training time in milliseconds. */
   trainTimeMs: number;
+  /** Look-ahead horizon used for the planning evaluation (Q/DQ only). */
+  planningHorizon?: number;
+  /** Success rate with the bounded look-ahead planner (Q/DQ only). */
+  planningSuccessRate?: number;
+  /** Mean solution length with the bounded look-ahead planner (Q/DQ only). */
+  planningMeanMoves?: number;
+  /** Mean solving time with the bounded look-ahead planner, in ms (Q/DQ only). */
+  planningMeanTimeMs?: number;
 }
 
 export interface BenchmarkConfig {
@@ -152,6 +166,8 @@ export interface BenchmarkConfig {
   seed?: number;
   /** Scramble depths probed for the robustness study (may exceed the trained depth). */
   robustnessDepths: number[];
+  /** Look-ahead horizon used for the planning evaluation (Q/DQ only). */
+  planningHorizon?: number;
 }
 
 /** One point of the robustness study: success rate at a scramble depth. */
@@ -161,6 +177,8 @@ export interface RobustnessCell {
   depth: number;
   trials: number;
   successRate: number;
+  /** Success rate with the bounded look-ahead planner (Q/DQ only). */
+  planningSuccessRate?: number;
   /** Depth the agent was actually trained to (for the same puzzle/algorithm). */
   trainedDepth: number;
 }

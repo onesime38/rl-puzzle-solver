@@ -1,4 +1,4 @@
-.minx-view {
+.pyra-view {
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -12,17 +12,17 @@
   isolation: isolate;
 }
 
-.minx-view:active {
+.pyra-view:active {
   cursor: grabbing;
 }
 
-.minx-view canvas {
+.pyra-view canvas {
   display: block;
   width: 100% !important;
   height: 100% !important;
 }
 
-.minx-view .minx-hint {
+.pyra-view .pyra-hint {
   position: absolute;
   left: 50%;
   bottom: 0.5rem;
@@ -37,8 +37,8 @@
   opacity: 0.85;
 }
 
-.minx-view--loading,
-.minx-view--loading::after {
+.pyra-view--loading,
+.pyra-view--loading::after {
   display: flex;
   align-items: center;
   justify-content: center;

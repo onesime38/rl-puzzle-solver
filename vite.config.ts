@@ -11,7 +11,6 @@ export default defineConfig({
         manualChunks: {
           three: ["three"],
           charts: ["uplot"],
-          math: ["katex"],
         },
       },
     },

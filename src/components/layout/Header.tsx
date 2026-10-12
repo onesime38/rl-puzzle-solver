@@ -7,8 +7,6 @@ import "./header.css";
 const NAV = [
   { to: "/", label: "Accueil" },
   { to: "/simulateur", label: "Simulateur" },
-  { to: "/algorithmes", label: "Algorithmes" },
-  { to: "/resultats", label: "Résultats" },
   { to: "/a-propos", label: "À propos" },
 ];
 
@@ -72,7 +70,7 @@ export function Header() {
           </span>
           <span>
             <strong>{PROJECT.name}</strong>
-            <small>cube 3×3×3 · megaminx</small>
+            <small>cube 3×3×3 · pyraminx</small>
           </span>
         </NavLink>
 
