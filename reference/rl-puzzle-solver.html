@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RL Puzzle Solver — Q-learning, Double Q-learning, MDP</title>
+<style>
+:root{--bg:#0e1116;--panel:#171b22;--panel2:#1e242d;--line:#2b3340;--txt:#e8ecf1;--mut:#8b96a5;--acc:#4cc9f0;--acc2:#f72585;--ok:#3ddc97}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:22px 20px 8px;max-width:1150px;margin:auto}
+h1{margin:0;font-size:24px;letter-spacing:.2px}
+header p{margin:4px 0 0;color:var(--mut)}
+main{max-width:1150px;margin:auto;padding:12px 20px 40px}
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;cursor:pointer;text-align:left;color:var(--txt);font:inherit;transition:.15s}
+.card:hover{border-color:var(--acc);transform:translateY(-2px)}
+.card.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(76,201,240,.25)}
+.card h3{margin:8px 0 4px}
+.card small{color:var(--mut)}
+.card svg{width:96px;height:96px;display:block}
+.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:minmax(320px,1.05fr) 1fr;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.panel h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:var(--mut)}
+#stage{height:360px;display:flex;align-items:center;justify-content:center;perspective:900px;touch-action:none;cursor:grab;user-select:none}
+#cube3d{position:relative;width:0;height:0;transform-style:preserve-3d}
+.stk{position:absolute;width:76px;height:76px;margin:-38px 0 0 -38px;border:4px solid #0a0c10;border-radius:10px;backface-visibility:hidden;transition:background .25s}
+.stk.flash,#hexsvg .flash{animation:fl .5s}
+@keyframes fl{0%{filter:brightness(2.2)}100%{filter:none}}
+#hexwrap{height:360px;display:flex;align-items:center;justify-content:center}
+#hexsvg{width:340px;height:340px}
+#hexsvg polygon{stroke:#0a0c10;stroke-width:4;stroke-linejoin:round;transition:fill .25s}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+button.b{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font:inherit;cursor:pointer}
+button.b:hover:not(:disabled){border-color:var(--acc)}
+button.b:disabled{opacity:.45;cursor:not-allowed}
+button.pri{background:var(--acc);color:#04202a;border-color:var(--acc);font-weight:700}
+button.pri2{background:var(--ok);color:#052014;border-color:var(--ok);font-weight:700}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--panel2);color:var(--txt);border:0;padding:8px 12px;font:inherit;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--acc);color:#04202a;font-weight:700}
+label.s{display:flex;flex-direction:column;font-size:12px;color:var(--mut);min-width:96px}
+label.s input{width:100%}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.stat{background:var(--panel2);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:18px}
+.stat span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px}
+canvas{width:100%;height:190px;background:var(--panel2);border-radius:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-height:32px;margin-top:6px}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.chip.cur{background:var(--acc);color:#04202a;border-color:var(--acc)}
+.chip.done{opacity:.45}
+#msg{min-height:24px;margin-top:6px;color:var(--mut)}
+#msg.ok{color:var(--ok)}#msg.ko{color:#ff6b6b}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--mut);font-weight:600}
+details{margin-top:14px}summary{cursor:pointer;color:var(--acc)}
+details p,details li{color:#c4ccd6;font-size:14px}
+code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:13px}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+@media(max-width:860px){.grid,.choice{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Résolution de puzzles par apprentissage par renforcement</h1>
+  <p>Q-learning · Double Q-learning · Processus de décision markovien — Mini-projet de processus stochastiques (M2IA)</p>
+</header>
+<main>
+  <div class="choice">
+    <button class="card" id="pickCube"><svg viewBox="0 0 100 100"><g stroke="#0a0c10" stroke-width="2"><polygon points="50,8 88,28 50,48 12,28" fill="#f5f5f5"/><polygon points="12,28 50,48 50,92 12,72" fill="#00a651"/><polygon points="88,28 50,48 50,92 88,72" fill="#c8102e"/><line x1="31" y1="18" x2="69" y2="38"/><line x1="69" y1="18" x2="31" y2="38"/><line x1="31" y1="38" x2="31" y2="82"/><line x1="69" y1="38" x2="69" y2="82"/><line x1="12" y1="50" x2="50" y2="70"/><line x1="88" y1="50" x2="50" y2="70"/></g></svg><h3>Cube 2×2×2</h3><small>Le Rubik's Cube classique (version tabulaire : 3,67 M d'états).</small></button>
+    <button class="card" id="pickHex"><svg viewBox="-60 -60 120 120"><g stroke="#0a0c10" stroke-width="2.5" stroke-linejoin="round" id="iconHex"></g></svg><h3>Hexagone</h3><small>Puzzle hexagonal à 2 anneaux (12 cases, 6 couleurs, 8 mouvements).</small></button>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="grid">
+      <section class="panel">
+        <h2 id="viewTitle">Puzzle</h2>
+        <div id="stage" class="hidden"><div id="cube3d"></div></div>
+        <div id="hexwrap" class="hidden"><svg id="hexsvg" viewBox="-150 -150 300 300"></svg></div>
+        <div class="row" id="moveBtns"></div>
+        <div class="row">
+          <label class="s">Profondeur du mélange : <b id="depthV">3</b><input type="range" id="depth" min="1" max="5" value="3"></label>
+          <button class="b" id="btnScramble">Mélanger</button>
+          <button class="b" id="btnReset">Remettre résolu</button>
+        </div>
+        <div class="chips" id="chips"></div>
+        <div id="msg"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Agent</h2>
+        <div class="seg" id="algoSeg">
+          <button data-a="q" class="on">Q-learning</button>
+          <button data-a="dq">Double Q-learning</button>
+          <button data-a="mdp">Processus de Markov (MDP)</button>
+        </div>
+        <div class="row" id="ctrlBtns">
+          <button class="b pri" id="btnStart">Start</button>
+          <button class="b pri2" id="btnSolve">Résoudre</button>
+          <button class="b" id="btnCompare">Comparer les 3 algos</button>
+        </div>
+        <div class="row" id="params">
+          <label class="s">α (apprentissage) <b id="aV">0.50</b><input type="range" id="alpha" min="0.1" max="0.9" step="0.05" value="0.5"></label>
+          <label class="s">γ (actualisation) <b id="gV">0.95</b><input type="range" id="gamma" min="0.8" max="0.99" step="0.01" value="0.95"></label>
+          <label class="s">ε (exploration) <b id="eV">0.30</b><input type="range" id="eps" min="0.05" max="0.6" step="0.05" value="0.3"></label>
+          <label class="s">p (glissement) <b id="pV">0.05</b><input type="range" id="slip" min="0" max="0.3" step="0.01" value="0.05"></label>
+          <button class="b" id="btnNew">Réinitialiser l'agent</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><span>Épisodes</span><b id="stEp">0</b></div>
+          <div class="stat"><span>Niveau (profondeur)</span><b id="stLv">1</b></div>
+          <div class="stat"><span>États visités</span><b id="stSt">0</b></div>
+          <div class="stat"><span>Réussite</span><b id="stRt">–</b></div>
+        </div>
+        <canvas id="chart"></canvas>
+        <div class="legend"><span><i style="background:#4cc9f0"></i>Q-learning</span><span><i style="background:#f72585"></i>Double Q-learning</span><span>Taux de résolution vs épisodes</span></div>
+        <div id="cmp"></div>
+      </section>
+    </div>
+
+    <details>
+      <summary>Modélisation (MDP) et algorithmes</summary>
+      <ul>
+        <li><b>États S</b> : configuration des couleurs du puzzle. <b>Actions A</b> : les rotations (cube : U, R, F et leurs inverses ; hexagone : anneau extérieur, anneau intérieur, demi-hexagones S1 et S2, chacun dans les deux sens).</li>
+        <li><b>Transition P(s'|s,a)</b> : déterministe, mais avec une probabilité <code>p</code> de « glissement » (action aléatoire) pour obtenir un vrai processus markovien stochastique. <b>Récompense</b> : −1 par coup, 0 à l'état résolu (état absorbant).</li>
+        <li><b>Q-learning</b> : <code>Q(s,a) ← Q(s,a) + α [ r + γ max<sub>a'</sub> Q(s',a') − Q(s,a) ]</code></li>
+        <li><b>Double Q-learning</b> : deux tables Q<sub>A</sub>, Q<sub>B</sub> ; on met à jour l'une avec l'action choisie par elle et évaluée par l'autre, ce qui réduit le biais de surestimation du max.</li>
+        <li><b>Processus de Markov (MDP)</b> : le graphe d'états est construit explicitement, puis résolu par itération de valeur : <code>V(s) = max<sub>a</sub> Σ P(s'|s,a)[ r + γ V(s') ]</code>.</li>
+        <li><b>Curriculum</b> : l'agent apprend d'abord sur des mélanges de 1 coup, puis de 2, etc., dès que le taux de résolution dépasse 95 %. Un rejeu rétrospectif de la trajectoire de mélange accélère la propagation des valeurs.</li>
+        <li><b>Pourquoi le 2×2×2 et pas le 3×3×3 ?</b> Le 3×3×3 compte 4,3·10¹⁹ états : une table Q est impossible, il faudrait un réseau de neurones (Deep RL). Le 2×2×2 et l'hexagone restent traitables en tabulaire.</li>
+      </ul>
+    </details>
+  </div>
+</main>
+<script>
+// ===== Moteur RL : puzzles, Q-learning, Double Q-learning, MDP (value iteration) =====
+const COLORS = ['#c8102e','#ff7f11','#f5f5f5','#ffd400','#00a651','#0057b8'];
+
+function makePuzzle(name, n, perms, names, solved){
+  const nA = perms.length;
+  const apply = (s,a)=>{ const p=perms[a], r=new Uint8Array(n); for(let i=0;i<n;i++) r[i]=s[p[i]]; return r; };
+  const key = s=>s.join('');
+  const solvedKey = key(solved);
+  return {name,n,nA,perms,names,solved,apply,key,solvedKey,
+    isSolved:s=>key(s)===solvedKey,
+    inv:a=>a^1,
+    scramble(d){ let s=solved.slice(), last=-1;
+      for(let i=0;i<d;i++){ let a; do{ a=Math.floor(Math.random()*nA);}while(last>=0&&a===(last^1)); s=apply(s,a); last=a; }
+      return s; }};
+}
+
+function buildCube(){
+  const st=[]; // stickers
+  for(const x of[-1,1])for(const y of[-1,1])for(const z of[-1,1])for(let a=0;a<3;a++){
+    const nrm=[0,0,0]; nrm[a]=[x,y,z][a]; st.push({pos:[x,y,z],nrm});
+  }
+  const rot=(v,ax)=>{const [x,y,z]=v; return ax===2?[-y,x,z]:ax===0?[x,-z,y]:[z,y,-x];};
+  const find=(p,n)=>st.findIndex(s=>s.pos.every((v,i)=>v===p[i])&&s.nrm.every((v,i)=>v===n[i]));
+  const perms=[], names=[];
+  for(const [nm,ax] of [['U',1],['R',0],['F',2]]){
+    for(const k of [1,3]){
+      const p=Array.from({length:24},(_,i)=>i);
+      st.forEach((s,i)=>{ if(s.pos[ax]!==1) return;
+        let pp=s.pos,nn=s.nrm; for(let t=0;t<k;t++){pp=rot(pp,ax);nn=rot(nn,ax);}
+        p[find(pp,nn)]=i; });
+      perms.push(p); names.push(k===1?nm:nm+"'");
+    }
+  }
+  const colorOf=n=>n[0]===1?0:n[0]===-1?1:n[1]===1?2:n[1]===-1?3:n[2]===1?4:5;
+  const solved=Uint8Array.from(st.map(s=>colorOf(s.nrm)));
+  const P=makePuzzle('Cube 2×2×2',24,perms,names,solved);
+  P.stickers=st; return P;
+}
+
+function buildHex(){
+  const n=12, id=()=>Array.from({length:n},(_,i)=>i);
+  const cyc=(c,dir)=>{const p=id(),m=c.length; for(let j=0;j<m;j++){ if(dir>0)p[c[(j+1)%m]]=c[j]; else p[c[(j-1+m)%m]]=c[j]; } return p;};
+  const defs=[['Ext',[0,1,2,3,4,5]],['Int',[6,7,8,9,10,11]],['S1',[0,1,2,8,7,6]],['S2',[3,4,5,11,10,9]]];
+  const perms=[],names=[];
+  for(const [nm,c] of defs){ perms.push(cyc(c,1)); names.push(nm+'↻'); perms.push(cyc(c,-1)); names.push(nm+'↺'); }
+  const solved=Uint8Array.from([0,1,2,3,4,5,0,1,2,3,4,5]);
+  return makePuzzle('Hexagone',n,perms,names,solved);
+}
+
+// ---------- Agent tabulaire (Q-learning / Double Q-learning) ----------
+class QAgent{
+  constructor(puz,algo,o={}){
+    this.puz=puz; this.algo=algo; // 'q' | 'dq'
+    this.alpha=o.alpha??0.5; this.gamma=o.gamma??0.95; this.eps=o.eps??0.15; this.slip=o.slip??0.05;
+    this.maxDepth=o.maxDepth??5; this.level=1; this.episodes=0; this.history=[]; this.QA=new Map(); this.QB=new Map();
+  }
+  row(M,k){ let r=M.get(k); if(!r){ r=new Float32Array(this.puz.nA).fill(-15); M.set(k,r);} return r; }
+  values(k){ const a=this.row(this.QA,k); if(this.algo==='q') return a; const b=this.row(this.QB,k),r=new Float32Array(a.length); for(let i=0;i<a.length;i++) r[i]=a[i]+b[i]; return r; }
+  argmax(v,rand=true){ let best=-Infinity,bi=[]; for(let i=0;i<v.length;i++){ if(v[i]>best+1e-9){best=v[i];bi=[i];} else if(Math.abs(v[i]-best)<=1e-9) bi.push(i);} return rand?bi[Math.floor(Math.random()*bi.length)]:bi[0]; }
+  get nStates(){ return this.QA.size; }
+  // mise à jour d'une transition (s,a,r,s') — Q-learning ou Double Q-learning
+  update(k,a,k2,done){
+    const r=done?0:-1;
+    if(this.algo==='q'){
+      const q=this.row(this.QA,k), q2=this.row(this.QA,k2);
+      const tgt=r+(done?0:this.gamma*Math.max(...q2)); q[a]+=this.alpha*(tgt-q[a]);
+    } else {
+      const useA=Math.random()<0.5, T=useA?this.QA:this.QB, O=useA?this.QB:this.QA;
+      const q=this.row(T,k), qt2=this.row(T,k2), qo2=this.row(O,k2);
+      const as=this.argmax(qt2);
+      const tgt=r+(done?0:this.gamma*qo2[as]); q[a]+=this.alpha*(tgt-q[a]);
+    }
+  }
+  // rejeu rétrospectif : on rejoue à l'envers la trajectoire de mélange (transitions réellement possibles)
+  replay(d){
+    const P=this.puz; let s=P.solved.slice(), last=-1; const traj=[s];
+    const acts=[];
+    for(let i=0;i<d;i++){ let a; do{ a=Math.floor(Math.random()*P.nA);}while(last>=0&&a===(last^1)); s=P.apply(s,a); traj.push(s); acts.push(a); last=a; }
+    for(let i=d;i>=1;i--){ const k=P.key(traj[i]), k2=P.key(traj[i-1]); this.update(k,acts[i-1]^1,k2,k2===P.solvedKey); }
+  }
+  episode(){
+    const P=this.puz, d=1+Math.floor(Math.random()*this.level), maxSteps=3*d+6;
+    this.replay(d);
+    let s=P.scramble(d), k=P.key(s);
+    if(k===P.solvedKey){ return; }
+    for(let t=0;t<maxSteps;t++){
+      let a = Math.random()<this.eps ? Math.floor(Math.random()*P.nA) : this.argmax(this.values(k));
+      if(Math.random()<this.slip) a=Math.floor(Math.random()*P.nA); // transition stochastique
+      const s2=P.apply(s,a), k2=P.key(s2), done=k2===P.solvedKey, r=done?0:-1;
+      this.update(k,a,k2,done);
+      s=s2; k=k2; if(done) break;
+    }
+    this.episodes++;
+  }
+  solve(state,maxSteps=40){
+    const P=this.puz, path=[]; let s=state, seen=new Set([P.key(s)]);
+    for(let t=0;t<maxSteps;t++){
+      if(P.isSolved(s)) return {solved:true,path};
+      const v=this.values(P.key(s)), order=[...v.keys()].sort((x,y)=>v[y]-v[x]+(Math.random()-0.5)*1e-6);
+      let moved=false;
+      for(const a of order){ const s2=P.apply(s,a), k2=P.key(s2); if(!seen.has(k2)){ seen.add(k2); path.push(a); s=s2; moved=true; break; } }
+      if(!moved) break;
+    }
+    return {solved:P.isSolved(s),path};
+  }
+  evaluate(depth,n=80){ let ok=0; for(let i=0;i<n;i++){ const s=this.puz.scramble(depth); if(this.solve(s,depth*3+6).solved) ok++; } return ok/n; }
+  // un "epoch" = lot d'épisodes + évaluation + passage au niveau suivant (curriculum)
+  epoch(n=400){
+    for(let i=0;i<n;i++) this.episode();
+    const rate=this.evaluate(this.level);
+    this.history.push({ep:this.episodes,level:this.level,rate});
+    if(rate>=0.95 && this.level<this.maxDepth) this.level++;
+    return {ep:this.episodes,level:this.level,rate,states:this.nStates};
+  }
+}
+
+// ---------- Processus de décision markovien explicite + itération de valeur ----------
+class MDPAgent{
+  constructor(puz,o={}){ this.puz=puz; this.gamma=o.gamma??0.98; this.slip=o.slip??0.05; this.depth=o.maxDepth??5; this.built=false; }
+  build(){
+    const P=this.puz, idx=new Map(), states=[P.solved]; idx.set(P.solvedKey,0);
+    let frontier=[0]; const dist=[0];
+    for(let d=1;d<=this.depth;d++){ const nf=[];
+      for(const i of frontier) for(let a=0;a<P.nA;a++){ const s2=P.apply(states[i],a),k=P.key(s2);
+        if(!idx.has(k)){ idx.set(k,states.length); states.push(s2); dist.push(d); nf.push(states.length-1);} }
+      frontier=nf; }
+    const N=states.length, nA=P.nA, next=new Int32Array(N*nA);
+    for(let i=0;i<N;i++) for(let a=0;a<nA;a++){ const j=idx.get(P.key(P.apply(states[i],a))); next[i*nA+a]= j===undefined?-1:j; }
+    this.idx=idx; this.states=states; this.next=next; this.N=N; this.dist=dist;
+    // itération de valeur : V(s)=max_a Σ P(s'|s,a)[R+γV(s')], R=-1, objectif absorbant V=0
+    const V=new Float64Array(N), Vout=-30, g=this.gamma, p=this.slip; let it=0, delta=1; this.deltas=[];
+    while(it<500 && delta>1e-6){ delta=0; it++;
+      const Vn=new Float64Array(N);
+      for(let i=1;i<N;i++){ let avg=0; for(let a=0;a<nA;a++){ const j=next[i*nA+a]; avg+=(j<0?Vout:V[j]); } avg/=nA;
+        let best=-Infinity; for(let a=0;a<nA;a++){ const j=next[i*nA+a], vj=j<0?Vout:V[j]; const q=-1+g*((1-p)*vj+p*avg); if(q>best)best=q; }
+        Vn[i]=best; delta=Math.max(delta,Math.abs(best-V[i])); }
+      V.set(Vn); this.deltas.push(delta); }
+    this.V=V; this.iters=it; this.built=true; return {states:N,iters:it};
+  }
+  solve(state,maxSteps=40){
+    const P=this.puz; let i=this.idx.get(P.key(state)); const path=[];
+    if(i===undefined) return {solved:false,path,outside:true};
+    for(let t=0;t<maxSteps&&i!==0;t++){ let best=-Infinity,ba=-1;
+      for(let a=0;a<P.nA;a++){ const j=this.next[i*P.nA+a]; if(j>=0&&this.V[j]>best){best=this.V[j];ba=a;} }
+      if(ba<0) break; path.push(ba); i=this.next[i*P.nA+ba]; }
+    return {solved:i===0,path};
+  }
+  evaluate(depth,n=80){ let ok=0; for(let k=0;k<n;k++) if(this.solve(this.puz.scramble(depth)).solved) ok++; return ok/n; }
+}
+
+if(typeof module!=='undefined') module.exports={COLORS,buildCube,buildHex,QAgent,MDPAgent};
+
+// ===================== INTERFACE =====================
+const $=id=>document.getElementById(id);
+const puzzles={cube:buildCube(),hex:buildHex()};
+const ALG={q:'Q-learning',dq:'Double Q-learning',mdp:'Processus de Markov (MDP)'};
+let mode=null, algo='q', training=false, busy=false;
+const agents={cube:{},hex:{}}, states={cube:puzzles.cube.solved.slice(),hex:puzzles.hex.solved.slice()};
+let stickerEls=[], hexEls=[], rotX=-28, rotY=-38;
+
+// ---- icône hexagone ----
+function hexGeom(){
+  const r1=70,r2=130,V=(r,k)=>{const a=(-90+60*k)*Math.PI/180;return [r*Math.cos(a),r*Math.sin(a)];};
+  const pts=[];
+  for(let i=0;i<6;i++){ const a=V(r1,i),b=V(r1,i+1),c=V(r2,i+1),d=V(r2,i); pts[i]=[a,b,c,d]; }       // anneau extérieur
+  for(let i=0;i<6;i++){ const a=V(r1,i),b=V(r1,i+1); pts[6+i]=[[0,0],a,b]; }                          // anneau intérieur
+  return pts.map(p=>p.map(q=>q.map(v=>v.toFixed(1)).join(',')).join(' '));
+}
+const HEXP=hexGeom();
+(function icon(){ const g=$('iconHex'); const P=puzzles.hex; let h=''; HEXP.forEach((p,i)=>{ h+=`<polygon points="${p.split(' ').map(q=>q.split(',').map(v=>(v*0.42).toFixed(1)).join(',')).join(' ')}" fill="${COLORS[P.solved[i]]}"/>`; }); g.innerHTML=h; })();
+
+// ---- construction des vues ----
+function buildHexView(){
+  const svg=$('hexsvg'); svg.innerHTML=''; hexEls=[];
+  HEXP.forEach(p=>{ const e=document.createElementNS('http://www.w3.org/2000/svg','polygon'); e.setAttribute('points',p); svg.appendChild(e); hexEls.push(e); });
+}
+function buildCubeView(){
+  const root=$('cube3d'); root.innerHTML=''; stickerEls=[]; const S=76;
+  const rot=n=>n[2]===1?'':n[2]===-1?'rotateY(180deg)':n[0]===1?'rotateY(90deg)':n[0]===-1?'rotateY(-90deg)':n[1]===1?'rotateX(90deg)':'rotateX(-90deg)';
+  puzzles.cube.stickers.forEach(st=>{
+    const d=document.createElement('div'); d.className='stk';
+    const [px,py,pz]=st.pos,[nx,ny,nz]=st.nrm;
+    d.style.transform=`translate3d(${(px+nx)*S/2}px,${-(py+ny)*S/2}px,${(pz+nz)*S/2}px) ${rot(st.nrm)}`;
+    root.appendChild(d); stickerEls.push(d);
+  });
+  applyCubeRot();
+}
+function applyCubeRot(){ $('cube3d').style.transform=`rotateX(${rotX}deg) rotateY(${rotY}deg)`; }
+(function drag(){ const st=$('stage'); let down=false,x=0,y=0;
+  st.addEventListener('pointerdown',e=>{down=true;x=e.clientX;y=e.clientY;st.style.cursor='grabbing';});
+  window.addEventListener('pointerup',()=>{down=false;st.style.cursor='grab';});
+  window.addEventListener('pointermove',e=>{ if(!down)return; rotY+=(e.clientX-x)*0.6; rotX-=(e.clientY-y)*0.6; x=e.clientX;y=e.clientY; applyCubeRot(); });
+})();
+
+function render(prev){
+  const s=states[mode];
+  const els=mode==='cube'?stickerEls:hexEls;
+  els.forEach((e,i)=>{
+    const c=COLORS[s[i]];
+    if(mode==='cube') e.style.background=c; else e.setAttribute('fill',c);
+    if(prev&&prev[i]!==s[i]){ e.classList.remove('flash'); void e.getBoundingClientRect&&e.getBoundingClientRect(); e.classList.add('flash'); }
+  });
+}
+
+// ---- agents ----
+function params(){ return {alpha:+$('alpha').value,gamma:+$('gamma').value,eps:+$('eps').value,slip:+$('slip').value,maxDepth:5}; }
+function getAgent(a=algo,m=mode){
+  if(!agents[m][a]){ const P=puzzles[m], o=params();
+    agents[m][a]= a==='mdp'? new MDPAgent(P,o) : new QAgent(P,a,o); }
+  return agents[m][a];
+}
+function setMsg(t,c=''){ const m=$('msg'); m.textContent=t; m.className=c; }
+
+// ---- stats + courbe ----
+function refreshStats(){
+  const ag=agents[mode][algo];
+  if(!ag){ $('stEp').textContent='0';$('stLv').textContent='–';$('stSt').textContent='0';$('stRt').textContent='–'; }
+  else if(algo==='mdp'){ $('stEp').textContent=ag.built?ag.iters+' it.':'0'; $('stLv').textContent=ag.built?ag.depth:'–'; $('stSt').textContent=ag.built?ag.N.toLocaleString('fr-FR'):'0'; $('stRt').textContent=ag.built&&ag.lastRate!=null?Math.round(ag.lastRate*100)+' %':'–'; }
+  else { const h=ag.history[ag.history.length-1]; $('stEp').textContent=ag.episodes.toLocaleString('fr-FR'); $('stLv').textContent=ag.level; $('stSt').textContent=ag.nStates.toLocaleString('fr-FR'); $('stRt').textContent=h?Math.round(h.rate*100)+' %':'–'; }
+  drawChart();
+}
+function drawChart(){
+  const cv=$('chart'), dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr;
+  const g=cv.getContext('2d'); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  const L=34,R=8,T=8,B=20, w=W-L-R, h=H-T-B;
+  g.strokeStyle='#2b3340'; g.fillStyle='#8b96a5'; g.font='11px system-ui'; g.lineWidth=1;
+  for(let i=0;i<=4;i++){ const y=T+h*i/4; g.beginPath(); g.moveTo(L,y); g.lineTo(W-R,y); g.stroke(); g.fillText(Math.round(100-25*i)+'%',2,y+4); }
+  let maxEp=1000; for(const a of ['q','dq']){ const ag=agents[mode]&&agents[mode][a]; if(ag) maxEp=Math.max(maxEp,ag.episodes); }
+  g.fillText('0',L,H-5); g.fillText(maxEp.toLocaleString('fr-FR')+' épisodes',W-R-90,H-5);
+  for(const [a,col] of [['q','#4cc9f0'],['dq','#f72585']]){
+    const ag=agents[mode]&&agents[mode][a]; if(!ag||!ag.history.length) continue;
+    g.strokeStyle=col; g.lineWidth=2; g.beginPath();
+    ag.history.forEach((p,i)=>{ const x=L+w*p.ep/maxEp, y=T+h*(1-p.rate); i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke();
+  }
+}
+window.addEventListener('resize',()=>mode&&drawChart());
+
+// ---- entraînement ----
+function updateBtns(){
+  $('btnStart').textContent= algo==='mdp'?'Start (construire le MDP)':(training?'Pause':'Start');
+  $('btnStart').disabled=busy;
+  $('btnSolve').disabled=busy||training;
+  $('btnCompare').disabled=busy||training;
+  $('btnScramble').disabled=busy; $('btnReset').disabled=busy;
+  $('params').querySelectorAll('input').forEach(i=>i.disabled=training);
+  document.querySelectorAll('#moveBtns button').forEach(b=>b.disabled=busy);
+  $('params').style.opacity=algo==='mdp'?0.55:1;
+}
+function startStop(){
+  const ag=getAgent();
+  if(algo==='mdp'){
+    setMsg('Construction du graphe markovien et itération de valeur…');
+    setTimeout(()=>{ const t0=performance.now(); const r=ag.build(); ag.lastRate=ag.evaluate(5,100);
+      refreshStats(); setMsg(`MDP construit : ${r.states.toLocaleString('fr-FR')} états, convergence en ${r.iters} itérations (${Math.round(performance.now()-t0)} ms). Prêt à résoudre.`,'ok'); updateBtns(); },20);
+    return;
+  }
+  if(training){ training=false; updateBtns(); setMsg('Entraînement en pause.'); return; }
+  training=true; updateBtns(); setMsg('Entraînement en cours…'); let good=0;
+  (function step(){
+    if(!training) return;
+    const r=ag.epoch(300); refreshStats();
+    if(ag.level>=ag.maxDepth && r.rate>=0.97) good++; else good=0;
+    if(good>=2||ag.episodes>400000){ training=false; updateBtns(); setMsg(good>=2?`Convergé : ${Math.round(r.rate*100)} % de réussite sur des mélanges de ${ag.maxDepth} coups.`:'Limite d\'épisodes atteinte.','ok'); return; }
+    setTimeout(step,0);
+  })();
+}
+
+// ---- actions ----
+function chipsShow(path,names){ $('chips').innerHTML=path.map((a,i)=>`<span class="chip" data-i="${i}">${names[a]}</span>`).join(''); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function playPath(path){
+  const P=puzzles[mode]; busy=true; updateBtns();
+  const chips=[...$('chips').children];
+  for(let i=0;i<path.length;i++){
+    chips.forEach((c,j)=>{ c.classList.toggle('cur',j===i); c.classList.toggle('done',j<i); });
+    const prev=states[mode]; states[mode]=P.apply(prev,path[i]); render(prev); await sleep(550);
+  }
+  chips.forEach(c=>{c.classList.remove('cur');c.classList.add('done');});
+  busy=false; updateBtns();
+}
+async function solve(){
+  const P=puzzles[mode], ag=agents[mode][algo];
+  if(P.isSolved(states[mode])){ setMsg('Le puzzle est déjà résolu. Clique sur « Mélanger ».'); return; }
+  if(!ag||(algo==='mdp'&&!ag.built)||(algo!=='mdp'&&ag.episodes===0)){ setMsg('Entraîne d\'abord cet agent avec « Start ».','ko'); return; }
+  const res=ag.solve(states[mode].slice(),40);
+  if(!res.solved){ setMsg(res.outside?'État hors de l\'espace exploré par le MDP (mélange trop profond).':'L\'agent n\'a pas trouvé de solution : poursuis l\'entraînement ou réduis la profondeur.','ko'); return; }
+  chipsShow(res.path,P.names); setMsg(`${ALG[algo]} : résolu en ${res.path.length} coups.`,'ok');
+  await playPath(res.path);
+}
+function scramble(){
+  const P=puzzles[mode], d=+$('depth').value; let s; do{ s=P.scramble(d);}while(P.isSolved(s));
+  const prev=states[mode]; states[mode]=s; render(prev); $('chips').innerHTML=''; setMsg(`Puzzle mélangé (${d} coups).`);
+}
+function resetPuzzle(){ const prev=states[mode]; states[mode]=puzzles[mode].solved.slice(); render(prev); $('chips').innerHTML=''; setMsg(''); }
+function manual(a){ const P=puzzles[mode]; const prev=states[mode]; states[mode]=P.apply(prev,a); render(prev); $('chips').innerHTML=''; setMsg(P.isSolved(states[mode])?'Puzzle résolu !':'','ok'); }
+
+async function compare(){
+  const P=puzzles[mode], d=+$('depth').value, N=100; busy=true; updateBtns(); setMsg('Comparaison en cours…'); await sleep(30);
+  let rows='';
+  for(const a of ['q','dq','mdp']){
+    const ag=agents[mode][a];
+    if(!ag||(a==='mdp'&&!ag.built)||(a!=='mdp'&&!ag.episodes)){ rows+=`<tr><td>${ALG[a]}</td><td colspan="3" style="color:var(--mut)">non entraîné</td></tr>`; continue; }
+    let ok=0,len=0; const t0=performance.now();
+    for(let i=0;i<N;i++){ const r=ag.solve(P.scramble(d),40); if(r.solved){ok++;len+=r.path.length;} }
+    rows+=`<tr><td>${ALG[a]}</td><td>${ok} %</td><td>${ok?(len/ok).toFixed(2):'–'}</td><td>${Math.round(performance.now()-t0)} ms</td></tr>`;
+  }
+  $('cmp').innerHTML=`<table><tr><th>Algorithme (mélanges de ${d} coups, ${N} essais)</th><th>Réussite</th><th>Coups moyens</th><th>Temps</th></tr>${rows}</table>`;
+  busy=false; updateBtns(); setMsg('');
+}
+
+// ---- sélection du mode ----
+function choose(m){
+  if(training){ training=false; }
+  mode=m; $('app').classList.remove('hidden');
+  $('pickCube').classList.toggle('sel',m==='cube'); $('pickHex').classList.toggle('sel',m==='hex');
+  $('stage').classList.toggle('hidden',m!=='cube'); $('hexwrap').classList.toggle('hidden',m!=='hex');
+  $('viewTitle').textContent=puzzles[m].name+(m==='cube'?' — glisse pour tourner':'');
+  if(m==='cube') buildCubeView(); else buildHexView();
+  $('moveBtns').innerHTML=puzzles[m].names.map((n,i)=>`<button class="b" data-a="${i}">${n}</button>`).join('');
+  $('moveBtns').querySelectorAll('button').forEach(b=>b.onclick=()=>manual(+b.dataset.a));
+  $('chips').innerHTML=''; $('cmp').innerHTML=''; setMsg('');
+  render(); refreshStats(); updateBtns();
+}
+$('pickCube').onclick=()=>choose('cube'); $('pickHex').onclick=()=>choose('hex');
+$('algoSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ if(training) return; algo=b.dataset.a;
+  $('algoSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); setMsg(''); refreshStats(); updateBtns(); });
+$('btnStart').onclick=startStop; $('btnSolve').onclick=solve; $('btnScramble').onclick=scramble; $('btnReset').onclick=resetPuzzle; $('btnCompare').onclick=compare;
+$('btnNew').onclick=()=>{ agents[mode]={}; $('cmp').innerHTML=''; refreshStats(); setMsg('Agents réinitialisés.'); updateBtns(); };
+[['alpha','aV'],['gamma','gV'],['eps','eV'],['slip','pV']].forEach(([i,o])=>$(i).oninput=()=>$(o).textContent=(+$(i).value).toFixed(2));
+$('depth').oninput=()=>$('depthV').textContent=$('depth').value;
+
+</script>
+</body>
+</html>

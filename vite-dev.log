@@ -1,0 +1,102 @@
+
+> rl-puzzle-solver@1.0.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m718[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m00:32:17[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/engine/index.ts[22m
+[2m00:32:17[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/engine/index.ts[22m
+[2m00:32:17[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/engine/hexagon.ts[22m
+[2m00:34:43[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/types.ts[22m
+[2m00:34:53[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/qlearning.ts[22m
+[2m00:34:54[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/qlearning.ts[22m
+[2m00:35:04[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/train.ts[22m
+[2m00:35:22[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m00:35:32[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m00:35:53[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/worker.ts[22m
+[2m00:36:07[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/worker.ts[22m
+[2m00:36:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx, /src/components/simulator/BenchmarkRunner.tsx[22m
+[2m00:37:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/BenchmarkRunner.tsx[22m
+[2m00:38:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/HexView.tsx[22m
+[2m00:38:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/Hex3DScene.tsx[22m
+[2m00:38:08[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/components/visual/hexLayout.ts[22m
+[2m00:38:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/hexView.css[22m
+[2m00:39:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx, /src/pages/Resultats.tsx, /src/components/simulator/Workspace.tsx[22m
+[2m00:52:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:52:17[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:52:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:52:43[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:52:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:53:08[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:53:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:53:33[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:53:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:54:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:54:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:55:02[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m00:56:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/workspace.css[22m
+[2m00:57:53[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Simulateur.tsx[22m
+[2m00:58:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Simulateur.tsx[22m
+[2m00:58:40[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Simulateur.tsx[22m
+[2m00:58:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Simulateur.tsx[22m
+[2m00:59:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m00:59:32[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m00:59:44[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m00:59:54[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m01:00:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m01:00:15[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m01:00:24[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m01:00:36[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx[22m
+[2m01:00:58[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:01:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:01:18[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:01:28[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:01:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:02:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Algorithmes.tsx[22m
+[2m01:02:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Algorithmes.tsx[22m
+[2m01:03:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Algorithmes.tsx[22m
+[2m01:03:22[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Workspace.tsx[22m
+[2m01:03:42[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/app/App.tsx[22m
+[2m01:04:01[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/APropos.tsx, /src/components/layout/Footer.tsx, /src/components/layout/Header.tsx[22m
+[2m01:04:21[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/layout/Header.tsx[22m
+[2m01:04:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/layout/Footer.tsx[22m
+[2m01:04:56[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
+[2m01:08:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MegaminxGlyph.tsx[22m
+[2m01:08:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MegaminxGlyph.tsx[22m
+[2m01:09:04[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:09:04[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:09:12[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:11:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/cubeView.css[22m
+[2m01:41:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:41:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:41:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:41:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:41:59[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:42:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/visual/MegaminxScene.tsx[22m
+[2m01:44:00[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/types.ts[22m
+[2m01:44:13[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx, /src/components/simulator/BenchmarkRunner.tsx[22m
+[2m01:44:27[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m01:44:40[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m01:44:59[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m01:45:24[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2msrc/agents/benchmark.ts[22m
+[2m01:51:34[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx, /src/components/simulator/BenchmarkRunner.tsx[22m
+[2m01:51:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx, /src/pages/Resultats.tsx, /src/components/simulator/Workspace.tsx[22m
+[2m01:52:36[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Resultats.tsx[22m
+[2m01:53:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/resultats.css[22m
+[2m01:54:46[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:54:59[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:55:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:55:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:55:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:55:59[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:56:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:56:30[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:56:38[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/Workspace.tsx[22m
+[2m01:57:20[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/workspace.css[22m
+[2m01:59:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/BenchmarkRunner.tsx[22m
+[2m01:59:27[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/simulator/BenchmarkRunner.tsx[22m
+[2m02:07:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx, /src/pages/Resultats.tsx, /src/components/simulator/Workspace.tsx[22m
+[2m02:07:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.tsx, /src/pages/Resultats.tsx, /src/components/simulator/Workspace.tsx[22m

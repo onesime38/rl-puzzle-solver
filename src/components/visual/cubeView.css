@@ -1,0 +1,23 @@
+.cube-view {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 22rem;
+  border: var(--border);
+  border-radius: var(--radius-m);
+  background: radial-gradient(circle at 32% 28%, var(--surface-2), var(--surface));
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  isolation: isolate;
+}
+
+.cube-view:active {
+  cursor: grabbing;
+}
+
+.cube-view canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}

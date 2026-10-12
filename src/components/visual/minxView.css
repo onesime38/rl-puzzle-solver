@@ -1,0 +1,47 @@
+.minx-view {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-height: 62vh;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-m);
+  background: radial-gradient(circle at 32% 28%, var(--surface-2), var(--surface));
+  cursor: grab;
+  touch-action: none;
+  isolation: isolate;
+}
+
+.minx-view:active {
+  cursor: grabbing;
+}
+
+.minx-view canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.minx-view .minx-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 0.5rem;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-muted, rgba(255, 255, 255, 0.55));
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.minx-view--loading,
+.minx-view--loading::after {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  content: "Chargement de la vue 3D…";
+  color: var(--text-muted, rgba(255, 255, 255, 0.55));
+}

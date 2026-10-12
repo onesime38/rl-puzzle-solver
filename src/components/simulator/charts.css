@@ -1,0 +1,26 @@
+.chart {
+  width: 100%;
+  margin: var(--sp-2) 0 var(--sp-3);
+}
+
+.chart .uplot {
+  font-family: var(--font-mono);
+}
+
+.chart-empty {
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  padding: var(--sp-5);
+  text-align: center;
+}
+
+.chart-block {
+  margin-top: var(--sp-4);
+}
+
+.chart-block h3 {
+  font-size: var(--fs-s);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
